@@ -1,0 +1,547 @@
+# Universal ApexData.ai Agent and OpenTelemetry Collector Deployment
+# 
+# ==================================================================================
+# CLIENT INSTRUCTIONS - MUST READ
+# ==================================================================================
+# 
+# IMPORTANT NOTES:
+# 
+# This deployment includes all standard Kubernetes resources for comprehensive
+# monitoring of your cluster.
+# 
+# ==================================================================================
+# 
+# This file contains complete deployment of ApexData Agent and OpenTelemetry Collector
+# for monitoring your Kubernetes cluster.
+# 
+# DEPLOYMENT METHODS:
+# 
+# METHOD 1 - ENVIRONMENT VARIABLES (RECOMMENDED):
+# 
+# 1. Set environment variables:
+#    export APEXDATA_OTEL_ENDPOINT="clientname-otel.app.apexdata.ai"
+#    export APEXDATA_BASE64_CREDENTIALS="$(echo -n 'username:password' | base64)"
+#    export APEXDATA_CLUSTER_NAME="production-cluster"
+# 
+# 2. Deploy with command:
+#    envsubst < universal-deployment.yml | kubectl apply -f -
+# 
+# METHOD 2 - DIRECT FILE REPLACEMENT:
+# 
+# 1. Replace environment variables with actual values:
+#    - ${APEXDATA_OTEL_ENDPOINT} with your endpoint (without port)
+#    - ${APEXDATA_BASE64_CREDENTIALS} with your Base64 credentials  
+#    - ${APEXDATA_CLUSTER_NAME} with your cluster name
+# 
+# 2. Deploy with command:
+#    kubectl apply -f universal-deployment.yml
+# 
+# NOTE: Method 1 (environment variables) is recommended over manual replacement
+# 
+# REQUIREMENTS:
+# 
+# Ensure you have cluster admin rights to create:
+# - Namespace, ServiceAccount  
+# - ClusterRole and ClusterRoleBinding
+# - Deployments and DaemonSet
+# - ConfigMap and Service
+# 
+# AUTOMATED SCRIPT (EASIEST WAY):
+# 
+# 1. Use the provided deploy.sh script:
+#    ./deploy.sh --interactive
+# 
+# DEPLOYMENT VERIFICATION:
+# 
+# kubectl get pods -n apexdata-ai
+# kubectl logs -n apexdata-ai deployment/otel-collector
+# 
+# COMPONENTS:
+# - apexdata-agent: main agent for cluster metrics collection
+# - apexdata-agent-unscheduled-pods: tracking unscheduled pods  
+# - apexdata-agent-shard: DaemonSet for collecting metrics from each node
+# - otel-collector: collector for forwarding data to your endpoint
+
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: apexdata-ai
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: apexdata-agent-sa
+  namespace: apexdata-ai
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: node-and-pod-viewer
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  - secrets
+  - nodes
+  - pods
+  - services
+  - serviceaccounts
+  - resourcequotas
+  - replicationcontrollers
+  - limitranges
+  - persistentvolumeclaims
+  - persistentvolumes
+  - namespaces
+  - endpoints
+  - events
+  verbs:
+  - list
+  - watch
+- apiGroups:
+  - metrics.k8s.io
+  resources:
+  - nodes
+  - pods
+  verbs:
+  - list
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - statefulsets
+  - daemonsets
+  - deployments
+  - replicasets
+  verbs:
+  - list
+  - watch
+- apiGroups:
+  - batch
+  resources:
+  - cronjobs
+  - jobs
+  verbs:
+  - list
+  - watch
+- apiGroups:
+  - autoscaling
+  resources:
+  - horizontalpodautoscalers
+  verbs:
+  - list
+  - watch
+- apiGroups:
+  - authentication.k8s.io
+  resources:
+  - tokenreviews
+  verbs:
+  - create
+- apiGroups:
+  - authorization.k8s.io
+  resources:
+  - subjectaccessreviews
+  verbs:
+  - create
+- apiGroups:
+  - policy
+  resources:
+  - poddisruptionbudgets
+  verbs:
+  - list
+  - watch
+- apiGroups:
+  - certificates.k8s.io
+  resources:
+  - certificatesigningrequests
+  verbs:
+  - list
+  - watch
+- apiGroups:
+  - discovery.k8s.io
+  resources:
+  - endpointslices
+  verbs:
+  - list
+  - watch
+- apiGroups:
+  - storage.k8s.io
+  resources:
+  - storageclasses
+  - volumeattachments
+  verbs:
+  - list
+  - watch
+- apiGroups:
+  - admissionregistration.k8s.io
+  resources:
+  - mutatingwebhookconfigurations
+  - validatingwebhookconfigurations
+  verbs:
+  - list
+  - watch
+- apiGroups:
+  - networking.k8s.io
+  resources:
+  - networkpolicies
+  - ingressclasses
+  - ingresses
+  verbs:
+  - list
+  - watch
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - list
+  - watch
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resources:
+  - clusterrolebindings
+  - clusterroles
+  - rolebindings
+  - roles
+  verbs:
+  - list
+  - watch
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: apexdata-agent-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: node-and-pod-viewer
+subjects:
+  - kind: ServiceAccount
+    name: apexdata-agent-sa
+    namespace: apexdata-ai
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    app: opentelemetry
+    component: otel-collector-conf
+  name: otel-collector-conf
+  namespace: apexdata-ai
+data:
+  otel-collector-config: |
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            endpoint: ${env:MY_POD_IP}:4317
+          http:
+            endpoint: 0.0.0.0:4318
+    processors:
+      batch:    
+    exporters:
+      otlp:
+        endpoint: 'https://${APEXDATA_OTEL_ENDPOINT}:444'
+        tls:
+          insecure: false
+        headers:
+          Authorization: "Basic ${APEXDATA_BASE64_CREDENTIALS}"
+      debug: {}
+    service:
+      pipelines:
+        metrics:
+          receivers: [otlp]
+          processors: [batch]
+          exporters: [otlp, debug]
+        traces:
+          receivers: [otlp]
+          processors: [batch]
+          exporters: [otlp, debug]
+        logs:
+          receivers: [otlp]
+          processors: [batch]
+          exporters: [otlp, debug]
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: otel-collector
+  name: otel-collector
+  namespace: apexdata-ai
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: otel-collector
+  template:
+    metadata:
+      labels:
+        app: otel-collector
+    spec:
+      containers:
+        - command:
+            - /otelcol-contrib
+            - --config=/conf/otel-collector-config.yaml
+          env:
+            - name: MY_POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: GOMEMLIMIT
+              value: 1600MiB
+          image: otel/opentelemetry-collector-contrib:latest
+          name: otel-collector
+          ports:
+            - containerPort: 4317
+            - containerPort: 4318
+          resources:
+            limits:
+              cpu: '1'
+              memory: 2Gi
+            requests:
+              cpu: 200m
+              memory: 400Mi
+          volumeMounts:
+            - mountPath: /conf
+              name: otel-collector-config-vol
+      volumes:
+        - configMap:
+            items:
+              - key: otel-collector-config
+                path: otel-collector-config.yaml
+            name: otel-collector-conf
+          name: otel-collector-config-vol
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: opentelemetry
+  name: otel-collector-service
+  namespace: apexdata-ai
+spec:
+  ports:
+    - name: grpc-otel
+      port: 4317
+      protocol: TCP
+      targetPort: 4317
+    - name: http-otel
+      port: 4318
+      protocol: TCP
+      targetPort: 4318
+  selector:
+    app: otel-collector
+  type: ClusterIP
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: apexdata-agent
+  namespace: apexdata-ai
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: apexdata-agent
+  template:
+    metadata:
+      labels:
+        app: apexdata-agent
+    spec:
+      serviceAccountName: apexdata-agent-sa
+      automountServiceAccountToken: true
+      containers:
+        - name: apexdata-agent
+          image: docker.io/apexdata/apexdata-agent
+          imagePullPolicy: Always
+          args:
+            - --disable-node-collector
+            - --resources=certificatesigningrequests,configmaps,cronjobs,daemonsets,deployments,endpoints,horizontalpodautoscalers,ingresses,jobs,leases,limitranges,mutatingwebhookconfigurations,namespaces,networkpolicies,nodes,persistentvolumeclaims,persistentvolumes,poddisruptionbudgets,replicasets,replicationcontrollers,resourcequotas,secrets,services,statefulsets,storageclasses,validatingwebhookconfigurations,volumeattachments
+          env:
+            - name: OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE
+              value: cumulative
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: 'otel-collector-service:4317'
+            - name: K8S_CLUSTER_NAME
+              value: '${APEXDATA_CLUSTER_NAME}'
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: spec.nodeName
+          resources:
+            requests:
+              memory: '128Mi'
+              cpu: '100m'
+
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - mountPath: /tmp
+              name: tmp
+              readOnly: false
+      volumes:
+        - emptyDir: {}
+          name: tmp
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: apexdata-agent-unscheduled-pods
+  namespace: apexdata-ai
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: apexdata-agent-unscheduled-pods
+  template:
+    metadata:
+      labels:
+        app: apexdata-agent-unscheduled-pods
+    spec:
+      serviceAccountName: apexdata-agent-sa
+      automountServiceAccountToken: true
+      containers:
+        - name: apexdata-agent-unscheduled-pods
+          image: docker.io/apexdata/apexdata-agent
+          imagePullPolicy: Always
+          args:
+            - --disable-node-collector
+            - --resources=pods
+            - --track-unscheduled-pods
+          env:
+            - name: OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE
+              value: cumulative
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: 'otel-collector-service:4317'
+            - name: K8S_CLUSTER_NAME
+              value: '${APEXDATA_CLUSTER_NAME}'
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: spec.nodeName
+          resources:
+            requests:
+              memory: '128Mi'
+              cpu: '100m'
+
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - mountPath: /tmp
+              name: tmp
+              readOnly: false
+      volumes:
+        - emptyDir: {}
+          name: tmp
+
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: apexdata-agent-shard
+  namespace: apexdata-ai
+spec:
+  selector:
+    matchLabels:
+      app: apexdata-agent-shard
+  template:
+    metadata:
+      labels:
+        app: apexdata-agent-shard
+      annotations:
+        container.apparmor.security.beta.kubernetes.io/apexdata-agent-shard: unconfined
+    spec:
+      serviceAccountName: apexdata-agent-sa
+      automountServiceAccountToken: true
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      hostPID: true
+      containers:
+        - name: apexdata-agent-shard
+          image: docker.io/apexdata/apexdata-agent
+          imagePullPolicy: Always
+          args:
+            - --resources=pods
+            - --node=$(NODE_NAME)
+          env:
+            - name: OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE
+              value: cumulative
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: 'otel-collector-service:4317'
+            - name: K8S_CLUSTER_NAME
+              value: '${APEXDATA_CLUSTER_NAME}'
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: spec.nodeName
+          resources:
+            requests:
+              memory: '128Mi'
+              cpu: '100m'
+
+          securityContext:
+            privileged: true
+            allowPrivilegeEscalation: true
+            runAsUser: 0
+            runAsGroup: 0
+            seccompProfile:
+              type: Unconfined
+          volumeMounts:
+            - mountPath: /host/sys/fs/cgroup
+              name: cgroupfs
+              readOnly: true
+            - mountPath: /sys/kernel/tracing
+              name: tracefs
+              readOnly: false
+            - mountPath: /sys/kernel/debug
+              name: debugfs
+              readOnly: false
+            - mountPath: /sys/fs/bpf
+              name: bpffs
+              readOnly: true
+            - mountPath: /tmp
+              name: tmp
+              readOnly: false
+      volumes:
+        - hostPath:
+            path: /sys/fs/cgroup
+          name: cgroupfs
+        - hostPath:
+            path: /sys/kernel/tracing
+          name: tracefs
+        - hostPath:
+            path: /sys/kernel/debug
+          name: debugfs
+        - hostPath:
+            path: /sys/fs/bpf
+          name: bpffs
+        - emptyDir: {}
+          name: tmp
+
