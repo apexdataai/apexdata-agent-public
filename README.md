@@ -168,3 +168,52 @@ sudo ./service-manager.sh start
 # View logs
 ./service-manager.sh logs
 ```
+
+## What the Agent Collects
+
+The agent collects data from multiple sources:
+
+### 1. Kubernetes Metrics (K8sCollector)
+- Metrics for all cluster resources via kube-state-metrics
+- Pods, Deployments, Services, ConfigMaps, Secrets, Nodes, etc.
+- Kubernetes events
+
+### 2. Node Metrics (NodeCollector)
+- CPU, memory, disk, network
+- Uses Prometheus node_exporter collectors
+- Cloud provider metadata (AWS, GCP, Azure, etc.)
+
+### 3. Container Metrics (eBPF Tracer)
+The eBPF tracer collects:
+- **Processes**: process start/stop, OOM kills
+- **Network connections**: TCP connect/close, listen sockets
+- **TCP retransmissions**
+- **L7 protocols**: HTTP, HTTP/2, DNS, MySQL, PostgreSQL, Redis, MongoDB, Kafka, RabbitMQ, Memcached, Cassandra, NATS, Dubbo
+- **TLS/SSL**: GoTLS and OpenSSL uprobe tracing
+- **File operations**
+
+### 4. Logs Collection
+- Journald logs
+- Container logs via tail readers
+- Parsing of log levels, timestamps, multiline logs
+
+### 5. Metadata
+- Machine ID, System UUID
+- Hostname, kernel version
+- Cloud provider metadata (AWS, GCP, Azure, DigitalOcean, Hetzner)
+
+### 📤 Data Flow
+
+```
+Agents → collect metrics/logs/traces
+   ↓
+Prometheus registry → metric aggregation
+   ↓
+OpenTelemetry SDK → export in OTLP format
+   ↓
+OTel Collector (in cluster) → buffering and batch sending
+   ↓
+Endpoint → receive data via HTTPS with Basic Auth
+```
+
+All data is sent using the OpenTelemetry Protocol (OTLP).
