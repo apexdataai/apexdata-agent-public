@@ -64,34 +64,24 @@ check_dependencies() {
         return 0
     fi
     
-    # Some packages are missing
-    print_warning "The following required packages are missing:"
+    # Some packages are missing - exit with clear instructions
+    print_error "The following required packages are missing:"
     for package in "${missing_packages[@]}"; do
         echo "  - $package"
     done
     
     echo ""
-    echo "These packages are required for the agent to work properly."
-    echo "Install command: sudo apt install -y --fix-missing ${missing_packages[*]}"
+    print_warning "IMPORTANT: Dependencies must be installed manually before running this script."
+    print_warning "Automatic installation is disabled to prevent unexpected system updates and service restarts."
     echo ""
-    read -p "Do you want to install them now? (y/n): " -n 1 -r
+    echo "Please install the missing packages manually using:"
+    echo "  sudo apt update"
+    echo "  sudo apt install -y --fix-missing ${missing_packages[*]}"
     echo ""
-    
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        print_status "Installing missing packages..."
-        apt update
-        apt install -y --fix-missing "${missing_packages[@]}"
-        
-        if [[ $? -eq 0 ]]; then
-            print_success "Dependencies installed successfully"
-        else
-            print_error "Failed to install dependencies"
-            exit 1
-        fi
-    else
-        print_error "Cannot proceed without required dependencies"
-        exit 1
-    fi
+    echo "After installing dependencies, run this script again."
+    echo ""
+    print_error "Cannot proceed without required dependencies"
+    exit 1
 }
 
 install_service() {
