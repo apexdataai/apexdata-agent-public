@@ -20,16 +20,24 @@ global:
 
 # ApexData configuration (REQUIRED)
 apexdata:
-  # -- OTel endpoint (without port)
-  # Example: "clientname-otel.app.apexdata.ai"
-  otelEndpoint: ""
+  # -- Client name (used as username and to build endpoint)
+  # Endpoint will be: ${clientName}.collector.eu.apexdata.ai:444
+  clientName: ""
 
-  # -- Base64 encoded credentials (username:password)
-  # Generate with: echo -n 'username:password' | base64
-  base64Credentials: ""
+  # -- Password for authentication
+  # Will be combined with clientName for Basic Auth
+  password: ""
 
   # -- Cluster name identifier
   clusterName: ""
+
+  # -- Override endpoint domain (optional)
+  # Default: collector.eu.apexdata.ai
+  # Full endpoint: https://${clientName}.${endpointDomain}:444
+  endpointDomain: "collector.eu.apexdata.ai"
+
+  # -- Override endpoint port (optional)
+  endpointPort: "444"
 
 # OpenTelemetry Collector configuration
 otelCollector:

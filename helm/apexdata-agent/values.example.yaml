@@ -6,15 +6,19 @@
 
 # REQUIRED: ApexData configuration
 apexdata:
-  # OTel endpoint (without port)
-  otelEndpoint: "YOUR_CLIENT_NAME-otel.app.apexdata.ai"
+  # Client name (used as username and to build endpoint)
+  # Endpoint will be: https://${clientName}.collector.eu.apexdata.ai:444
+  clientName: "your-client-name"
 
-  # Base64 encoded credentials (username:password)
-  # Generate with: echo -n 'username:password' | base64
-  base64Credentials: "YOUR_BASE64_CREDENTIALS"
+  # Password for authentication (will be combined with clientName for Basic Auth)
+  password: "your-password"
 
   # Cluster name identifier
   clusterName: "production-cluster"
+
+  # Optional: Override endpoint domain (default: collector.eu.apexdata.ai)
+  # endpointDomain: "collector.eu.apexdata.ai"
+  # endpointPort: "444"
 
 # Global configuration
 global:

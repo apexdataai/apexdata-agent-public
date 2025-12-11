@@ -40,21 +40,22 @@ Check service endpoints:
 
 === CONFIGURATION ===
 
+Client Name: {{ .Values.apexdata.clientName }}
 Cluster Name: {{ .Values.apexdata.clusterName }}
-OTel Endpoint: {{ .Values.apexdata.otelEndpoint }}
+OTel Endpoint: https://{{ .Values.apexdata.clientName }}.{{ .Values.apexdata.endpointDomain }}:{{ .Values.apexdata.endpointPort }}
 
-{{- if not .Values.apexdata.otelEndpoint }}
+{{- if not .Values.apexdata.clientName }}
 
-WARNING: apexdata.otelEndpoint is not set!
+WARNING: apexdata.clientName is not set!
 Please configure it with:
-  helm upgrade {{ .Release.Name }} {{ .Chart.Name }} --set apexdata.otelEndpoint=YOUR_ENDPOINT
+  helm upgrade {{ .Release.Name }} {{ .Chart.Name }} --set apexdata.clientName=YOUR_CLIENT_NAME
 {{- end }}
 
-{{- if not .Values.apexdata.base64Credentials }}
+{{- if not .Values.apexdata.password }}
 
-WARNING: apexdata.base64Credentials is not set!
+WARNING: apexdata.password is not set!
 Please configure it with:
-  helm upgrade {{ .Release.Name }} {{ .Chart.Name }} --set apexdata.base64Credentials=$(echo -n 'user:pass' | base64)
+  helm upgrade {{ .Release.Name }} {{ .Chart.Name }} --set apexdata.password=YOUR_PASSWORD
 {{- end }}
 
 {{- if not .Values.apexdata.clusterName }}

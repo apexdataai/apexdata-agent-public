@@ -1,4 +1,7 @@
 {{- if .Values.otelCollector.enabled }}
+{{- $endpoint := printf "https://%s.%s:%s" .Values.apexdata.clientName .Values.apexdata.endpointDomain .Values.apexdata.endpointPort }}
+{{- $authString := printf "%s:%s" .Values.apexdata.clientName .Values.apexdata.password }}
+{{- $base64Auth := $authString | b64enc }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -28,11 +31,11 @@ data:
         endpoint: 0.0.0.0:13133
     exporters:
       otlp:
-        endpoint: 'https://{{ .Values.apexdata.otelEndpoint }}:444'
+        endpoint: '{{ $endpoint }}'
         tls:
           insecure: false
         headers:
-          Authorization: "Basic {{ .Values.apexdata.base64Credentials }}"
+          Authorization: "Basic {{ $base64Auth }}"
       debug:
         verbosity: basic
     service:
