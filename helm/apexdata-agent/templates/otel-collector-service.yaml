@@ -1,0 +1,26 @@
+{{- if .Values.otelCollector.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "apexdata-agent.fullname" . }}-otel-collector
+  namespace: {{ include "apexdata-agent.namespace" . }}
+  labels:
+    {{- include "apexdata-agent.otelCollector.labels" . | nindent 4 }}
+  {{- with .Values.otelCollector.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.otelCollector.service.type }}
+  ports:
+    - name: grpc-otlp
+      port: {{ .Values.otelCollector.service.ports.grpc }}
+      protocol: TCP
+      targetPort: otlp-grpc
+    - name: http-otlp
+      port: {{ .Values.otelCollector.service.ports.http }}
+      protocol: TCP
+      targetPort: otlp-http
+  selector:
+    {{- include "apexdata-agent.otelCollector.selectorLabels" . | nindent 4 }}
+{{- end }}

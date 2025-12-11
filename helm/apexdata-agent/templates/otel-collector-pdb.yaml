@@ -1,0 +1,19 @@
+{{- if and .Values.otelCollector.enabled .Values.otelCollector.podDisruptionBudget.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "apexdata-agent.fullname" . }}-otel-collector
+  namespace: {{ include "apexdata-agent.namespace" . }}
+  labels:
+    {{- include "apexdata-agent.otelCollector.labels" . | nindent 4 }}
+spec:
+  {{- if .Values.otelCollector.podDisruptionBudget.minAvailable }}
+  minAvailable: {{ .Values.otelCollector.podDisruptionBudget.minAvailable }}
+  {{- end }}
+  {{- if .Values.otelCollector.podDisruptionBudget.maxUnavailable }}
+  maxUnavailable: {{ .Values.otelCollector.podDisruptionBudget.maxUnavailable }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "apexdata-agent.otelCollector.selectorLabels" . | nindent 6 }}
+{{- end }}

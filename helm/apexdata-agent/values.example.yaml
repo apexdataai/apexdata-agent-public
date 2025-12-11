@@ -1,0 +1,120 @@
+# Example values file for ApexData Agent Helm Chart
+# Copy this file and customize for your environment
+#
+# Usage:
+#   helm install apexdata-agent ./helm/apexdata-agent -f values.example.yaml
+
+# REQUIRED: ApexData configuration
+apexdata:
+  # OTel endpoint (without port)
+  otelEndpoint: "YOUR_CLIENT_NAME-otel.app.apexdata.ai"
+
+  # Base64 encoded credentials (username:password)
+  # Generate with: echo -n 'username:password' | base64
+  base64Credentials: "YOUR_BASE64_CREDENTIALS"
+
+  # Cluster name identifier
+  clusterName: "production-cluster"
+
+# Global configuration
+global:
+  # Namespace for all resources
+  namespace: apexdata-ai
+  # Set to false if namespace already exists
+  createNamespace: true
+  # Image pull secrets for private registries
+  # imagePullSecrets:
+  #   - name: my-registry-secret
+
+# OpenTelemetry Collector configuration
+otelCollector:
+  enabled: true
+  replicas: 1
+
+  image:
+    repository: otel/opentelemetry-collector-contrib
+    tag: "0.114.0"
+    pullPolicy: IfNotPresent
+
+  resources:
+    limits:
+      cpu: "1"
+      memory: "2Gi"
+    requests:
+      cpu: "200m"
+      memory: "400Mi"
+
+  # Enable for high availability
+  podDisruptionBudget:
+    enabled: false
+    minAvailable: 1
+
+  # Pod scheduling
+  # nodeSelector:
+  #   kubernetes.io/os: linux
+  # tolerations:
+  #   - key: "dedicated"
+  #     operator: "Equal"
+  #     value: "monitoring"
+  #     effect: "NoSchedule"
+
+  # Pod annotations (e.g., for Prometheus scraping)
+  # podAnnotations:
+  #   prometheus.io/scrape: "true"
+  #   prometheus.io/port: "8888"
+
+# ApexData Agent - Main deployment
+agent:
+  enabled: true
+  replicas: 1
+
+  resources:
+    limits:
+      cpu: "200m"
+      memory: "256Mi"
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+
+# Unscheduled Pods tracker
+unscheduledPods:
+  enabled: true
+  replicas: 1
+
+# Node shard collector (DaemonSet)
+shard:
+  enabled: true
+
+  resources:
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+
+  # Run on all nodes including masters
+  # tolerations:
+  #   - operator: Exists
+
+  # Update strategy
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+
+# ServiceAccount configuration
+serviceAccount:
+  create: true
+  # Annotations for IRSA, Workload Identity, etc.
+  # annotations:
+  #   eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT:role/role-name
+
+# RBAC configuration
+rbac:
+  create: true
+
+# Common labels for all resources
+# commonLabels:
+#   environment: production
+#   team: platform

@@ -1,0 +1,295 @@
+# Default values for apexdata-agent
+# This is a YAML-formatted file.
+
+# -- Override the name of the chart
+nameOverride: ""
+# -- Override the full name of the chart
+fullnameOverride: ""
+
+# Global configuration
+global:
+  # -- Namespace to deploy resources (defaults to Release namespace)
+  namespace: apexdata-ai
+  # -- Create the namespace if it doesn't exist
+  createNamespace: true
+  # -- Image pull secrets for private registries
+  # Example:
+  # imagePullSecrets:
+  #   - name: my-registry-secret
+  imagePullSecrets: []
+
+# ApexData configuration (REQUIRED)
+apexdata:
+  # -- OTel endpoint (without port)
+  # Example: "clientname-otel.app.apexdata.ai"
+  otelEndpoint: ""
+
+  # -- Base64 encoded credentials (username:password)
+  # Generate with: echo -n 'username:password' | base64
+  base64Credentials: ""
+
+  # -- Cluster name identifier
+  clusterName: ""
+
+# OpenTelemetry Collector configuration
+otelCollector:
+  # -- Enable OTel Collector deployment
+  enabled: true
+
+  image:
+    # -- OTel Collector image repository
+    repository: otel/opentelemetry-collector-contrib
+    # -- OTel Collector image tag
+    tag: "0.114.0"
+    # -- Image pull policy
+    pullPolicy: IfNotPresent
+
+  # -- Number of replicas
+  replicas: 1
+
+  resources:
+    limits:
+      cpu: "1"
+      memory: "2Gi"
+    requests:
+      cpu: "200m"
+      memory: "400Mi"
+
+  # -- GOMEMLIMIT environment variable for Go memory management
+  goMemLimit: "1600MiB"
+
+  # -- Pod-level security context
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 10001
+    runAsGroup: 10001
+    fsGroup: 10001
+
+  # -- Container-level security context
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+
+  # Service configuration
+  service:
+    # -- Service type
+    type: ClusterIP
+    # -- Service ports
+    ports:
+      grpc: 4317
+      http: 4318
+    # -- Service annotations
+    annotations: {}
+
+  # -- Liveness probe configuration
+  livenessProbe:
+    httpGet:
+      path: /
+      port: 13133
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+
+  # -- Readiness probe configuration
+  readinessProbe:
+    httpGet:
+      path: /
+      port: 13133
+    initialDelaySeconds: 5
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+  # -- Node selector for pod scheduling
+  nodeSelector: {}
+
+  # -- Tolerations for pod scheduling
+  tolerations: []
+
+  # -- Affinity rules for pod scheduling
+  affinity: {}
+
+  # -- Additional pod annotations
+  podAnnotations: {}
+
+  # PodDisruptionBudget configuration
+  podDisruptionBudget:
+    # -- Enable PDB
+    enabled: false
+    # -- Minimum available pods
+    minAvailable: 1
+    # maxUnavailable: 1
+
+# ApexData Agent - Main deployment
+agent:
+  # -- Enable Agent deployment
+  enabled: true
+
+  image:
+    # -- Agent image repository
+    repository: docker.io/apexdata/apexdata-agent
+    # -- Agent image tag
+    tag: latest
+    # -- Image pull policy
+    pullPolicy: Always
+
+  # -- Number of replicas
+  replicas: 1
+
+  resources:
+    limits:
+      cpu: "200m"
+      memory: "256Mi"
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+
+  # -- Resources to collect (comma-separated)
+  resourcesList: "certificatesigningrequests,configmaps,cronjobs,daemonsets,deployments,endpoints,horizontalpodautoscalers,ingresses,jobs,leases,limitranges,mutatingwebhookconfigurations,namespaces,networkpolicies,nodes,persistentvolumeclaims,persistentvolumes,poddisruptionbudgets,replicasets,replicationcontrollers,resourcequotas,secrets,services,statefulsets,storageclasses,validatingwebhookconfigurations,volumeattachments"
+
+  # -- Container security context
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: false
+    capabilities:
+      drop:
+        - ALL
+
+  # -- Node selector for pod scheduling
+  nodeSelector: {}
+
+  # -- Tolerations for pod scheduling
+  tolerations: []
+
+  # -- Affinity rules for pod scheduling
+  affinity: {}
+
+  # -- Additional pod annotations
+  podAnnotations: {}
+
+# ApexData Agent - Unscheduled Pods tracker
+unscheduledPods:
+  # -- Enable Unscheduled Pods tracker deployment
+  enabled: true
+
+  image:
+    # -- Image repository
+    repository: docker.io/apexdata/apexdata-agent
+    # -- Image tag
+    tag: latest
+    # -- Image pull policy
+    pullPolicy: Always
+
+  # -- Number of replicas
+  replicas: 1
+
+  resources:
+    limits:
+      cpu: "200m"
+      memory: "256Mi"
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+
+  # -- Container security context
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: false
+    capabilities:
+      drop:
+        - ALL
+
+  # -- Node selector for pod scheduling
+  nodeSelector: {}
+
+  # -- Tolerations for pod scheduling
+  tolerations: []
+
+  # -- Affinity rules for pod scheduling
+  affinity: {}
+
+  # -- Additional pod annotations
+  podAnnotations: {}
+
+# ApexData Agent - DaemonSet for node-level collection
+shard:
+  # -- Enable Shard DaemonSet
+  enabled: true
+
+  image:
+    # -- Image repository
+    repository: docker.io/apexdata/apexdata-agent
+    # -- Image tag
+    tag: latest
+    # -- Image pull policy
+    pullPolicy: Always
+
+  resources:
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+
+  # -- Container security context (requires privileged for eBPF)
+  securityContext:
+    privileged: true
+    allowPrivilegeEscalation: true
+    runAsUser: 0
+    runAsGroup: 0
+    seccompProfile:
+      type: Unconfined
+
+  # -- Node selector for pod scheduling
+  nodeSelector: {}
+
+  # -- Tolerations for pod scheduling (e.g., for master nodes)
+  tolerations: []
+  # Example to run on all nodes including masters:
+  # tolerations:
+  #   - operator: Exists
+
+  # -- Affinity rules for pod scheduling
+  affinity: {}
+
+  # -- Additional pod annotations
+  podAnnotations: {}
+
+  # -- Update strategy for DaemonSet
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+
+# ServiceAccount configuration
+serviceAccount:
+  # -- Create ServiceAccount
+  create: true
+  # -- ServiceAccount name (auto-generated if empty)
+  name: ""
+  # -- Auto-mount service account token
+  automountServiceAccountToken: true
+  # -- ServiceAccount annotations
+  annotations: {}
+
+# RBAC configuration
+rbac:
+  # -- Create ClusterRole and ClusterRoleBinding
+  create: true
+
+# -- Common labels to add to all resources
+commonLabels: {}
+
+# -- Common annotations to add to all resources
+commonAnnotations: {}

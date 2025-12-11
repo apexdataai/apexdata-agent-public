@@ -1,0 +1,70 @@
+Thank you for installing {{ .Chart.Name }}!
+
+Your release is named: {{ .Release.Name }}
+Namespace: {{ .Values.global.namespace }}
+
+=== DEPLOYED COMPONENTS ===
+
+{{- if .Values.otelCollector.enabled }}
+OpenTelemetry Collector:
+  - Deployment: otel-collector
+  - Service: otel-collector-service (ports: {{ .Values.otelCollector.service.ports.grpc }}, {{ .Values.otelCollector.service.ports.http }})
+{{- end }}
+
+{{- if .Values.agent.enabled }}
+ApexData Agent:
+  - Deployment: apexdata-agent (replicas: {{ .Values.agent.replicas }})
+{{- end }}
+
+{{- if .Values.unscheduledPods.enabled }}
+Unscheduled Pods Tracker:
+  - Deployment: apexdata-agent-unscheduled-pods (replicas: {{ .Values.unscheduledPods.replicas }})
+{{- end }}
+
+{{- if .Values.shard.enabled }}
+Node Shard Collector:
+  - DaemonSet: apexdata-agent-shard (runs on each node)
+{{- end }}
+
+=== VERIFICATION ===
+
+Check pod status:
+  kubectl get pods -n {{ .Values.global.namespace }}
+
+Check logs:
+  kubectl logs -n {{ .Values.global.namespace }} deployment/otel-collector
+  kubectl logs -n {{ .Values.global.namespace }} deployment/apexdata-agent
+
+Check service endpoints:
+  kubectl get endpoints -n {{ .Values.global.namespace }}
+
+=== CONFIGURATION ===
+
+Cluster Name: {{ .Values.apexdata.clusterName }}
+OTel Endpoint: {{ .Values.apexdata.otelEndpoint }}
+
+{{- if not .Values.apexdata.otelEndpoint }}
+
+WARNING: apexdata.otelEndpoint is not set!
+Please configure it with:
+  helm upgrade {{ .Release.Name }} {{ .Chart.Name }} --set apexdata.otelEndpoint=YOUR_ENDPOINT
+{{- end }}
+
+{{- if not .Values.apexdata.base64Credentials }}
+
+WARNING: apexdata.base64Credentials is not set!
+Please configure it with:
+  helm upgrade {{ .Release.Name }} {{ .Chart.Name }} --set apexdata.base64Credentials=$(echo -n 'user:pass' | base64)
+{{- end }}
+
+{{- if not .Values.apexdata.clusterName }}
+
+WARNING: apexdata.clusterName is not set!
+Please configure it with:
+  helm upgrade {{ .Release.Name }} {{ .Chart.Name }} --set apexdata.clusterName=YOUR_CLUSTER_NAME
+{{- end }}
+
+=== SUPPORT ===
+
+For issues and questions, visit: https://apexdata.ai
+Documentation: https://github.com/apexdataai/apexdata-agent-public

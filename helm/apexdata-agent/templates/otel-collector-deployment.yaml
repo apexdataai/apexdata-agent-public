@@ -1,0 +1,90 @@
+{{- if .Values.otelCollector.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "apexdata-agent.fullname" . }}-otel-collector
+  namespace: {{ include "apexdata-agent.namespace" . }}
+  labels:
+    {{- include "apexdata-agent.otelCollector.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.otelCollector.replicas }}
+  selector:
+    matchLabels:
+      {{- include "apexdata-agent.otelCollector.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "apexdata-agent.otelCollector.labels" . | nindent 8 }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/otel-collector-configmap.yaml") . | sha256sum }}
+        {{- with .Values.otelCollector.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- include "apexdata-agent.imagePullSecrets" . | nindent 6 }}
+      {{- with .Values.otelCollector.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: otel-collector
+          image: "{{ .Values.otelCollector.image.repository }}:{{ .Values.otelCollector.image.tag }}"
+          imagePullPolicy: {{ .Values.otelCollector.image.pullPolicy }}
+          command:
+            - /otelcol-contrib
+            - --config=/conf/otel-collector-config.yaml
+          env:
+            - name: MY_POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: GOMEMLIMIT
+              value: {{ .Values.otelCollector.goMemLimit | quote }}
+          ports:
+            - name: otlp-grpc
+              containerPort: {{ .Values.otelCollector.service.ports.grpc }}
+              protocol: TCP
+            - name: otlp-http
+              containerPort: {{ .Values.otelCollector.service.ports.http }}
+              protocol: TCP
+            - name: health
+              containerPort: 13133
+              protocol: TCP
+          {{- with .Values.otelCollector.livenessProbe }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.otelCollector.readinessProbe }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.otelCollector.resources | nindent 12 }}
+          {{- with .Values.otelCollector.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: config
+              mountPath: /conf
+              readOnly: true
+      {{- with .Values.otelCollector.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.otelCollector.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.otelCollector.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "apexdata-agent.fullname" . }}-otel-config
+            items:
+              - key: otel-collector-config
+                path: otel-collector-config.yaml
+{{- end }}
