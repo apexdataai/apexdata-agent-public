@@ -254,6 +254,67 @@ restart_service() {
     show_status
 }
 
+update_service() {
+    print_status "Updating ApexData Agent Service..."
+    
+    # Check if service is installed
+    if [[ ! -f "$SERVICE_FILE" ]]; then
+        print_error "Service is not installed. Please run 'install' first."
+        exit 1
+    fi
+    
+    # Stop the service
+    if systemctl is-active --quiet "$SERVICE_NAME"; then
+        print_status "Stopping service..."
+        systemctl stop "$SERVICE_NAME"
+        print_success "Service stopped"
+    else
+        print_status "Service is already stopped"
+    fi
+    
+    # Get the script directory (repository root)
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    
+    # Change to repository directory and reset to origin/main
+    print_status "Updating repository to origin/main..."
+    cd "$SCRIPT_DIR"
+    
+    if ! git rev-parse --git-dir > /dev/null 2>&1; then
+        print_error "Not a git repository. Cannot perform git reset."
+        exit 1
+    fi
+    
+    git fetch origin main || {
+        print_error "Failed to fetch from origin/main"
+        exit 1
+    }
+    
+    git reset --hard origin/main || {
+        print_error "Failed to reset to origin/main"
+        exit 1
+    }
+    
+    print_success "Repository updated to origin/main"
+    
+    # Check if binary exists after reset
+    if [[ ! -f "./${SERVICE_NAME}" ]]; then
+        print_error "Binary './${SERVICE_NAME}' not found after git reset"
+        exit 1
+    fi
+    
+    # Copy binary to the same path as used in install
+    print_status "Copying binary to $BINARY_PATH..."
+    cp "./${SERVICE_NAME}" "$BINARY_PATH"
+    chmod +x "$BINARY_PATH"
+    print_success "Binary updated at $BINARY_PATH"
+    
+    # Restart the service
+    print_status "Restarting service..."
+    systemctl start "$SERVICE_NAME"
+    print_success "Service restarted"
+    show_status
+}
+
 show_status() {
     echo ""
     echo "=== Service Status ==="
@@ -277,6 +338,7 @@ show_help() {
     echo ""
     echo "Commands:"
     echo "  install    - Install and configure the service"
+    echo "  update     - Update binary from git (stop, git reset --hard origin/main, copy, restart)"
     echo "  uninstall  - Remove the service completely"
     echo "  start      - Start the service"
     echo "  stop       - Stop the service"
@@ -298,6 +360,10 @@ case "${1:-}" in
     install)
         check_root
         install_service
+        ;;
+    update)
+        check_root
+        update_service
         ;;
     uninstall)
         check_root
