@@ -1,0 +1,54 @@
+{{- if .Values.otelCollector.enabled }}
+{{- $endpoint := printf "https://%s.%s:%s" .Values.apexdata.clientName .Values.apexdata.endpointDomain .Values.apexdata.endpointPort }}
+{{- $authString := printf "%s:%s" .Values.apexdata.clientName .Values.apexdata.password }}
+{{- $base64Auth := $authString | b64enc }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "apexdata-agent.fullname" . }}-otel-config
+  namespace: {{ include "apexdata-agent.namespace" . }}
+  labels:
+    {{- include "apexdata-agent.otelCollector.labels" . | nindent 4 }}
+data:
+  otel-collector-config: |
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            endpoint: ${env:MY_POD_IP}:{{ .Values.otelCollector.service.ports.grpc }}
+          http:
+            endpoint: 0.0.0.0:{{ .Values.otelCollector.service.ports.http }}
+    processors:
+      batch:
+        send_batch_size: 10000
+        timeout: 10s
+      memory_limiter:
+        check_interval: 1s
+        limit_percentage: 80
+        spike_limit_percentage: 25
+    extensions:
+      health_check:
+        endpoint: 0.0.0.0:13133
+    exporters:
+      otlp:
+        endpoint: '{{ $endpoint }}'
+        tls:
+          insecure: false
+        headers:
+          Authorization: "Basic {{ $base64Auth }}"
+    service:
+      extensions: [health_check]
+      pipelines:
+        metrics:
+          receivers: [otlp]
+          processors: [memory_limiter, batch]
+          exporters: [otlp]
+        traces:
+          receivers: [otlp]
+          processors: [memory_limiter, batch]
+          exporters: [otlp]
+        logs:
+          receivers: [otlp]
+          processors: [memory_limiter, batch]
+          exporters: [otlp]
+{{- end }}

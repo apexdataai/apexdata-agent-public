@@ -1,0 +1,96 @@
+{{- if .Values.unscheduledPods.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "apexdata-agent.fullname" . }}-unscheduled-pods
+  namespace: {{ include "apexdata-agent.namespace" . }}
+  labels:
+    {{- include "apexdata-agent.unscheduledPods.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.unscheduledPods.replicas }}
+  selector:
+    matchLabels:
+      {{- include "apexdata-agent.unscheduledPods.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "apexdata-agent.unscheduledPods.labels" . | nindent 8 }}
+      {{- with .Values.unscheduledPods.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- include "apexdata-agent.imagePullSecrets" . | nindent 6 }}
+      serviceAccountName: {{ include "apexdata-agent.serviceAccountName" . }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automountServiceAccountToken }}
+      containers:
+        - name: unscheduled-pods
+          image: "{{ .Values.unscheduledPods.image.repository }}:{{ .Values.unscheduledPods.image.tag }}"
+          imagePullPolicy: {{ .Values.unscheduledPods.image.pullPolicy }}
+          args:
+            - --disable-node-collector
+            - --resources=pods
+            - --track-unscheduled-pods
+          env:
+            - name: OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE
+              value: cumulative
+            {{- if .Values.otelCollector.enabled }}
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: '{{ include "apexdata-agent.fullname" . }}-otel-collector:{{ .Values.otelCollector.service.ports.grpc }}'
+            {{- else }}
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: '{{ include "apexdata-agent.otelEndpoint" . }}'
+            - name: OTEL_EXPORTER_OTLP_HEADERS
+              value: 'Authorization={{ include "apexdata-agent.otelAuthHeader" . }}'
+            - name: OTEL_EXPORTER_OTLP_PROTOCOL
+              value: 'grpc'
+            {{- end }}
+            - name: K8S_CLUSTER_NAME
+              value: {{ .Values.apexdata.clusterName | quote }}
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          resources:
+            {{- toYaml .Values.unscheduledPods.resources | nindent 12 }}
+          livenessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - "pgrep -f apexdata-agent || exit 1"
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          startupProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - "pgrep -f apexdata-agent || exit 1"
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 12
+          securityContext:
+            {{- toYaml .Values.unscheduledPods.securityContext | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      {{- with .Values.unscheduledPods.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.unscheduledPods.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.unscheduledPods.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+        - name: tmp
+          emptyDir: {}
+{{- end }}

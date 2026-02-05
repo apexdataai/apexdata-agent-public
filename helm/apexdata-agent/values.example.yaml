@@ -1,0 +1,145 @@
+# Example values file for ApexData Agent Helm Chart
+# Copy this file and customize for your environment
+#
+# Usage:
+#   helm install apexdata-agent ./helm/apexdata-agent -f my-values.yaml
+
+# REQUIRED: ApexData configuration
+apexdata:
+  # Client name (used as username and to build endpoint)
+  # Endpoint will be: https://${clientName}.collector.eu.apexdata.ai:444
+  clientName: "your-client-name"
+
+  # Password for authentication (will be combined with clientName for Basic Auth)
+  password: "your-password"
+
+  # Cluster name identifier
+  clusterName: "production-cluster"
+
+  # Optional: Override endpoint domain (default: collector.eu.apexdata.ai)
+  # endpointDomain: "collector.eu.apexdata.ai"
+  # endpointPort: "444"
+
+# Global configuration
+global:
+  # Namespace for all resources
+  namespace: apexdata-ai
+  # Set to false if namespace already exists
+  createNamespace: true
+  # Image pull secrets for private registries
+  # imagePullSecrets:
+  #   - name: my-registry-secret
+
+# ============================================================================
+# DEPLOYMENT MODE
+# ============================================================================
+#
+# otelCollector.enabled controls how agents deliver telemetry:
+#
+# false (default) - Direct mode:
+#   Agents send data directly to remote endpoint with TLS + Basic Auth
+#   No collector pod/service is created
+#
+# true - Collector mode:
+#   Agents send data to in-cluster OTel Collector (no auth)
+#   Collector buffers, batches, and forwards to remote endpoint (with auth)
+#
+# The agent can also write to any OTLP-compatible endpoint (e.g., your own
+# OTel Collector, VictoriaMetrics vmagent, etc.). In collector mode, agents
+# don't hold any credentials - only the collector authenticates with the
+# remote endpoint.
+# ============================================================================
+
+# OpenTelemetry Collector configuration
+otelCollector:
+  # Set to true to deploy in-cluster OTel Collector
+  enabled: false
+  replicas: 1
+
+  image:
+    repository: otel/opentelemetry-collector-contrib
+    tag: "0.114.0"
+    pullPolicy: IfNotPresent
+
+  resources:
+    limits:
+      cpu: "1"
+      memory: "2Gi"
+    requests:
+      cpu: "200m"
+      memory: "400Mi"
+
+  # Enable for high availability
+  podDisruptionBudget:
+    enabled: false
+    minAvailable: 1
+
+  # Pod scheduling
+  # nodeSelector:
+  #   kubernetes.io/os: linux
+  # tolerations:
+  #   - key: "dedicated"
+  #     operator: "Equal"
+  #     value: "monitoring"
+  #     effect: "NoSchedule"
+
+  # Pod annotations (e.g., for Prometheus scraping)
+  # podAnnotations:
+  #   prometheus.io/scrape: "true"
+  #   prometheus.io/port: "8888"
+
+# ApexData Agent - Main deployment
+agent:
+  enabled: true
+  replicas: 1
+
+  resources:
+    limits:
+      cpu: "200m"
+      memory: "256Mi"
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+
+# Unscheduled Pods tracker
+unscheduledPods:
+  enabled: true
+  replicas: 1
+
+# Node shard collector (DaemonSet)
+shard:
+  enabled: true
+
+  resources:
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+
+  # Run on all nodes including masters
+  # tolerations:
+  #   - operator: Exists
+
+  # Update strategy
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+
+# ServiceAccount configuration
+serviceAccount:
+  create: true
+  # Annotations for IRSA, Workload Identity, etc.
+  # annotations:
+  #   eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT:role/role-name
+
+# RBAC configuration
+rbac:
+  create: true
+
+# Common labels for all resources
+# commonLabels:
+#   environment: production
+#   team: platform
