@@ -282,6 +282,35 @@ When `otelCollector.enabled=false`:
 | `serviceAccount.automountServiceAccountToken` | Auto-mount token | `true` |
 | `rbac.create` | Create ClusterRole/ClusterRoleBinding | `true` |
 
+## Custom Metrics / Shared Credentials
+
+The chart creates a Secret with OTLP credentials that any app in the namespace can use to send metrics directly to the remote ApexData endpoint:
+
+```
+Secret: {release}-apexdata-agent-otlp-credentials
+```
+
+This Secret contains:
+- `OTEL_EXPORTER_OTLP_ENDPOINT` — the remote collector URL
+- `OTEL_EXPORTER_OTLP_HEADERS` — Basic Auth header
+- `OTEL_EXPORTER_OTLP_PROTOCOL` — `grpc`
+
+To use it in any Deployment:
+
+```yaml
+spec:
+  containers:
+    - name: my-app
+      env:
+        - name: OTEL_SERVICE_NAME
+          value: "my-app"
+      envFrom:
+        - secretRef:
+            name: apexdata-agent-otlp-credentials  # adjust if release name differs
+```
+
+See [`custom-metrics/`](../../custom-metrics/) for full examples including Go and Python code.
+
 ## Components
 
 | Component | Type | Description |

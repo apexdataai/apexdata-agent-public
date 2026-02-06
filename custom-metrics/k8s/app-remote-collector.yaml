@@ -4,17 +4,17 @@
 # Use this when otelCollector.enabled=false in the Helm chart,
 # or when you want your custom metrics app to send independently.
 #
-# Usage:
-#   1. Create the secret with your credentials:
-#      kubectl -n apexdata-ai create secret generic custom-metrics-credentials \
-#        --from-literal=OTEL_EXPORTER_OTLP_ENDPOINT="YOUR_CLIENT.collector.eu.apexdata.ai:444" \
-#        --from-literal=OTEL_EXPORTER_OTLP_HEADERS="authorization=Basic YOUR_BASE64_TOKEN"
+# Prerequisites:
+#   The apexdata-agent Helm chart automatically creates a Secret with OTLP credentials:
+#     {release}-apexdata-agent-otlp-credentials
+#   Update the secretRef name below to match your Helm release name.
 #
-#   2. Build and push your image:
+# Usage:
+#   1. Build and push your image:
 #      docker build -t YOUR_REGISTRY/custom-metrics:latest .
 #      docker push YOUR_REGISTRY/custom-metrics:latest
 #
-#   3. Update the image below, then deploy:
+#   2. Update the image and secret name below, then deploy:
 #      kubectl apply -f k8s/app-remote-collector.yaml
 ---
 apiVersion: apps/v1
@@ -45,7 +45,7 @@ spec:
             # TLS enabled by default (OTEL_EXPORTER_OTLP_INSECURE not set)
           envFrom:
             - secretRef:
-                name: custom-metrics-credentials   # injects ENDPOINT + HEADERS
+                name: apexdata-agent-otlp-credentials   # created by Helm chart
           resources:
             requests:
               cpu: 50m

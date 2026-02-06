@@ -193,24 +193,27 @@ kubectl -n apexdata-ai logs deploy/apexdata-apexdata-agent-otel-collector -f
 
 ### Option B: Direct to Remote (no collector)
 
-App sends directly to the remote collector. Each app needs its own credentials.
+App sends directly to the remote collector using credentials from the Helm-managed Secret.
 
 ```
 Your App (TLS + Basic Auth) ──gRPC──► ApexData (remote)
 ```
 
-**1. Create a secret with credentials:**
+The apexdata-agent Helm chart automatically creates a Secret named `{release}-apexdata-agent-otlp-credentials` with the endpoint, auth header, and protocol. No manual secret creation is needed.
+
+**1. Deploy your app:**
 
 ```bash
-kubectl -n apexdata-ai create secret generic custom-metrics-credentials \
-  --from-literal=OTEL_EXPORTER_OTLP_ENDPOINT="YOUR_CLIENT.collector.eu.apexdata.ai:444" \
-  --from-literal=OTEL_EXPORTER_OTLP_HEADERS="authorization=Basic YOUR_BASE64_TOKEN"
+# Update the image and secret name in the manifest, then:
+kubectl apply -f k8s/app-remote-collector.yaml
 ```
 
-**2. Deploy your app:**
+The manifest uses `envFrom` to inject credentials from the Helm-managed Secret:
 
-```bash
-kubectl apply -f k8s/app-remote-collector.yaml
+```yaml
+envFrom:
+  - secretRef:
+      name: apexdata-agent-otlp-credentials  # adjust if release name differs
 ```
 
 ### When to Use Which

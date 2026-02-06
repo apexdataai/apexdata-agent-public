@@ -76,6 +76,21 @@ Please configure it with:
   helm upgrade {{ .Release.Name }} {{ .Chart.Name }} --set apexdata.clusterName=YOUR_CLUSTER_NAME
 {{- end }}
 
+=== SHARED OTLP CREDENTIALS ===
+
+A Secret with OTLP credentials has been created for use by custom apps:
+
+  Secret name: {{ include "apexdata-agent.fullname" . }}-otlp-credentials
+
+Use it in any Deployment with envFrom:
+
+  envFrom:
+    - secretRef:
+        name: {{ include "apexdata-agent.fullname" . }}-otlp-credentials
+
+This injects OTEL_EXPORTER_OTLP_ENDPOINT, OTEL_EXPORTER_OTLP_HEADERS, and
+OTEL_EXPORTER_OTLP_PROTOCOL into your pod. See custom-metrics/ for examples.
+
 === SUPPORT ===
 
 For issues and questions, visit: https://apexdata.ai
