@@ -1,0 +1,55 @@
+# Custom metrics app sending directly to remote ApexData collector (TLS + Basic Auth).
+# No local collector needed — the app connects to the remote endpoint directly.
+#
+# Use this when otelCollector.enabled=false in the Helm chart,
+# or when you want your custom metrics app to send independently.
+#
+# Usage:
+#   1. Create the secret with your credentials:
+#      kubectl -n apexdata-ai create secret generic custom-metrics-credentials \
+#        --from-literal=OTEL_EXPORTER_OTLP_ENDPOINT="YOUR_CLIENT.collector.eu.apexdata.ai:444" \
+#        --from-literal=OTEL_EXPORTER_OTLP_HEADERS="authorization=Basic YOUR_BASE64_TOKEN"
+#
+#   2. Build and push your image:
+#      docker build -t YOUR_REGISTRY/custom-metrics:latest .
+#      docker push YOUR_REGISTRY/custom-metrics:latest
+#
+#   3. Update the image below, then deploy:
+#      kubectl apply -f k8s/app-remote-collector.yaml
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: custom-metrics-demo
+  namespace: apexdata-ai              # same namespace as apexdata-agent
+  labels:
+    app: custom-metrics-demo
+    app.kubernetes.io/part-of: apexdata
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: custom-metrics-demo
+  template:
+    metadata:
+      labels:
+        app: custom-metrics-demo
+        app.kubernetes.io/part-of: apexdata
+    spec:
+      containers:
+        - name: app
+          image: YOUR_REGISTRY/custom-metrics:latest
+          env:
+            - name: OTEL_SERVICE_NAME
+              value: "my-app"
+            # TLS enabled by default (OTEL_EXPORTER_OTLP_INSECURE not set)
+          envFrom:
+            - secretRef:
+                name: custom-metrics-credentials   # injects ENDPOINT + HEADERS
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi

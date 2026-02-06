@@ -1,0 +1,60 @@
+# Custom metrics app using the ApexData agent's OTel Collector (no auth, no TLS).
+#
+# Prerequisites:
+#   1. Deploy apexdata-agent with otelCollector.enabled=true:
+#      helm install apexdata helm/apexdata-agent \
+#        --set apexdata.clientName=YOUR_CLIENT \
+#        --set apexdata.password=YOUR_PASSWORD \
+#        --set apexdata.clusterName=YOUR_CLUSTER \
+#        --set otelCollector.enabled=true
+#
+#   2. Build and push your image:
+#      docker build -t YOUR_REGISTRY/custom-metrics:latest .
+#      docker push YOUR_REGISTRY/custom-metrics:latest
+#
+#   3. Update the image and namespace below, then deploy:
+#      kubectl apply -f k8s/app-local-collector.yaml
+#
+# The collector service name follows the Helm naming convention:
+#   {RELEASE}-apexdata-agent-otel-collector.{NAMESPACE}.svc.cluster.local
+#
+# Default (release=apexdata, namespace=apexdata-ai):
+#   apexdata-apexdata-agent-otel-collector.apexdata-ai.svc.cluster.local:4317
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: custom-metrics-demo
+  namespace: apexdata-ai              # same namespace as apexdata-agent
+  labels:
+    app: custom-metrics-demo
+    app.kubernetes.io/part-of: apexdata
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: custom-metrics-demo
+  template:
+    metadata:
+      labels:
+        app: custom-metrics-demo
+        app.kubernetes.io/part-of: apexdata
+    spec:
+      containers:
+        - name: app
+          image: YOUR_REGISTRY/custom-metrics:latest
+          env:
+            # Point to the Helm-deployed OTel Collector (plain gRPC, no TLS, no auth)
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "apexdata-apexdata-agent-otel-collector:4317"
+            - name: OTEL_EXPORTER_OTLP_INSECURE
+              value: "true"
+            - name: OTEL_SERVICE_NAME
+              value: "my-app"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
