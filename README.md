@@ -54,7 +54,7 @@ The agent collects:
 - Process lifecycle and resource usage
 - Network connections and protocol-level metrics (HTTP, DNS, gRPC, databases)
 - eBPF-based container and process tracing
-- Optional: Redis, PHP-FPM, MySQL metrics
+- Optional: Redis, PHP-FPM, MySQL, PostgreSQL metrics and schema metadata
 
 ### Management
 
@@ -275,6 +275,88 @@ agent + shard + unscheduled-pods ──(OTLP, no auth)──> OTel Collector ─
 **Kubernetes custom pipeline:**
 ```
 agent + shard + unscheduled-pods ──> Client's Collector ──> ApexData + VictoriaMetrics + ...
+```
+
+## Database Monitoring
+
+### PostgreSQL
+
+The agent can connect to PostgreSQL instances to collect performance metrics and schema metadata for the SQL Explain feature.
+
+**Performance metrics** (collected at scrape interval): `pg_stat_activity`, `pg_stat_database`, `pg_stat_user_tables`, `pg_stat_statements`, `pg_stat_replication`.
+
+**Schema metadata** (collected hourly): table definitions, indexes, column types, and column statistics from system catalogs. This data powers the Explain feature -- offline query plan prediction without connecting to your database at analysis time.
+
+### Configuration
+
+Pass the PostgreSQL DSN via `--postgres-dsn`. Multiple instances can be comma-separated:
+
+```bash
+# Single instance
+--postgres-dsn='postgres://user:pass@host:5432/dbname?sslmode=disable'
+
+# Multiple instances
+--postgres-dsn='postgres://user:pass@host1:5432/db1,postgres://user:pass@host2:5432/db2'
+```
+
+### Agent Flags
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--postgres-dsn` | string | `""` | PostgreSQL connection string (comma-separated for multiple instances) |
+| `--postgres-auto-dsn-template` | string | `""` | DSN template with `{addr}` for auto-discovered instances |
+| `--pg-schema-collect-enabled` | bool | `true` | Enable hourly schema metadata collection for Explain |
+| `--pg-schema-collect-interval` | duration | `1h` | Schema metadata collection interval |
+
+### Schema Collection Details
+
+The schema collector runs 4 read-only catalog queries per cycle:
+- `pg_class` -- table row counts and page counts
+- `pg_indexes` -- index definitions (method, columns, uniqueness)
+- `information_schema.columns` -- column names, types, nullability
+- `pg_stats` -- column statistics (null fraction, distinct values, correlation)
+
+Data is emitted as an OTLP log record (~30 KB gzipped) with `source=pg_schema` attribute.
+
+### Required PostgreSQL Permissions
+
+```sql
+-- Minimum required grants
+GRANT CONNECT ON DATABASE <dbname> TO <agent_role>;
+GRANT pg_read_all_stats TO <agent_role>;  -- for complete pg_stats visibility
+```
+
+Without `pg_read_all_stats`, column statistics will only be available for tables owned by the agent's role.
+
+### Kubernetes Deployment
+
+For Kubernetes, pass the DSN via `shard.extraArgs` in your Helm values:
+
+```yaml
+shard:
+  extraArgs:
+    - "--postgres-dsn=postgres://user:pass@pg-host:5432/dbname?sslmode=disable"
+```
+
+Or via `helm install`:
+
+```bash
+helm install apexdata-agent ./helm/apexdata-agent \
+  --namespace apexdata-ai \
+  --create-namespace \
+  --set apexdata.clientName="your-client-name" \
+  --set apexdata.password="your-password" \
+  --set apexdata.clusterName="your-cluster-name" \
+  --set 'shard.extraArgs[0]=--postgres-dsn=postgres://user:pass@pg-host:5432/dbname?sslmode=disable'
+```
+
+To disable schema collection while keeping performance metrics:
+
+```yaml
+shard:
+  extraArgs:
+    - "--postgres-dsn=postgres://user:pass@pg-host:5432/dbname?sslmode=disable"
+    - "--pg-schema-collect-enabled=false"
 ```
 
 ## Support

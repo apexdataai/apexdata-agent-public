@@ -271,6 +271,7 @@ When `otelCollector.enabled=false`:
 | `shard.enabled` | Enable Shard DaemonSet | `true` |
 | `shard.updateStrategy.type` | Update strategy | `RollingUpdate` |
 | `shard.tolerations` | Tolerations (use `[{operator: Exists}]` for all nodes) | `[]` |
+| `shard.extraArgs` | Extra arguments passed to the agent binary | `[]` |
 
 ### RBAC & ServiceAccount
 
@@ -281,6 +282,43 @@ When `otelCollector.enabled=false`:
 | `serviceAccount.annotations` | SA annotations (IRSA, Workload Identity) | `{}` |
 | `serviceAccount.automountServiceAccountToken` | Auto-mount token | `true` |
 | `rbac.create` | Create ClusterRole/ClusterRoleBinding | `true` |
+
+### Database Monitoring (Extra Args)
+
+The agent supports PostgreSQL monitoring via `shard.extraArgs`. These flags are passed directly to the agent binary:
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--postgres-dsn` | string | `""` | PostgreSQL DSN (comma-separated for multiple instances) |
+| `--pg-schema-collect-enabled` | bool | `true` | Enable hourly schema metadata collection for SQL Explain |
+| `--pg-schema-collect-interval` | duration | `1h` | Schema metadata collection interval |
+
+**Example -- PostgreSQL monitoring with schema collection:**
+
+```yaml
+shard:
+  extraArgs:
+    - "--postgres-dsn=postgres://monitor:pass@pg-primary:5432/mydb?sslmode=require"
+```
+
+**Example -- PostgreSQL metrics only (no schema collection):**
+
+```yaml
+shard:
+  extraArgs:
+    - "--postgres-dsn=postgres://monitor:pass@pg-primary:5432/mydb?sslmode=require"
+    - "--pg-schema-collect-enabled=false"
+```
+
+**Example -- Multiple PostgreSQL instances:**
+
+```yaml
+shard:
+  extraArgs:
+    - "--postgres-dsn=postgres://monitor:pass@pg1:5432/db1,postgres://monitor:pass@pg2:5432/db2"
+```
+
+The PostgreSQL user needs `CONNECT` privilege and `pg_read_all_stats` role for complete schema statistics. See the [main README](../../README.md#database-monitoring) for details.
 
 ## Custom Metrics / Shared Credentials
 

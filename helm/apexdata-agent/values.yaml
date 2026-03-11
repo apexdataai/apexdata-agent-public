@@ -274,6 +274,14 @@ shard:
   # -- Additional pod annotations
   podAnnotations: {}
 
+  # -- Extra arguments to pass to the agent binary
+  # Examples:
+  #   - "--pprof-address=localhost:6060"
+  #   - "--postgres-dsn=postgres://user:pass@host:5432/dbname?sslmode=disable"
+  #   - "--pg-schema-collect-enabled=false"  # disable schema collection for SQL Explain
+  #   - "--pg-schema-collect-interval=2h"    # collect schema metadata every 2 hours
+  extraArgs: []
+
   # -- Update strategy for DaemonSet
   updateStrategy:
     type: RollingUpdate

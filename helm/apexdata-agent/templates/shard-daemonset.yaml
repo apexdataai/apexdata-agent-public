@@ -37,6 +37,9 @@ spec:
           args:
             - --resources=pods
             - --node=$(NODE_NAME)
+            {{- range .Values.shard.extraArgs }}
+            - {{ . | quote }}
+            {{- end }}
           env:
             - name: OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE
               value: cumulative
