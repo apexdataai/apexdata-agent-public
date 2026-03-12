@@ -16,10 +16,7 @@ For standalone servers (VMs, bare-metal) -- no Kubernetes required. The agent in
 
 ### Prerequisites
 
-```bash
-# Ubuntu/Debian
-sudo apt install -y --fix-missing libsystemd-dev gcc build-essential
-```
+No build dependencies required -- the binary is statically linked.
 
 ### Install
 

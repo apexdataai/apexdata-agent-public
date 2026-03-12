@@ -32,11 +32,14 @@ spec:
       hostPID: true
       containers:
         - name: shard
-          image: "{{ .Values.shard.image.repository }}:{{ .Values.shard.image.tag }}"
-          imagePullPolicy: {{ .Values.shard.image.pullPolicy }}
+          image: {{ include "apexdata-agent.agentImage" (dict "component" .Values.shard "global" .Values.image) | quote }}
+          imagePullPolicy: {{ include "apexdata-agent.agentPullPolicy" (dict "component" .Values.shard "global" .Values.image) }}
           args:
             - --resources=pods
             - --node=$(NODE_NAME)
+            {{- if .Values.shard.postgresDsn }}
+            - --postgres-dsn=$(POSTGRES_DSN)
+            {{- end }}
             {{- range .Values.shard.extraArgs }}
             - {{ . | quote }}
             {{- end }}
@@ -48,11 +51,27 @@ spec:
               value: '{{ include "apexdata-agent.fullname" . }}-otel-collector:{{ .Values.otelCollector.service.ports.grpc }}'
             {{- else }}
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
-              value: '{{ include "apexdata-agent.otelEndpoint" . }}'
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "apexdata-agent.fullname" . }}-otlp-credentials
+                  key: OTEL_EXPORTER_OTLP_ENDPOINT
             - name: OTEL_EXPORTER_OTLP_HEADERS
-              value: 'Authorization={{ include "apexdata-agent.otelAuthHeader" . }}'
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "apexdata-agent.fullname" . }}-otlp-credentials
+                  key: OTEL_EXPORTER_OTLP_HEADERS
             - name: OTEL_EXPORTER_OTLP_PROTOCOL
-              value: 'grpc'
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "apexdata-agent.fullname" . }}-otlp-credentials
+                  key: OTEL_EXPORTER_OTLP_PROTOCOL
+            {{- end }}
+            {{- if .Values.shard.postgresDsn }}
+            - name: POSTGRES_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "apexdata-agent.fullname" . }}-postgres
+                  key: POSTGRES_DSN
             {{- end }}
             - name: K8S_CLUSTER_NAME
               value: {{ .Values.apexdata.clusterName | quote }}

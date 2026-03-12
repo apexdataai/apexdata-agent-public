@@ -18,6 +18,17 @@ global:
   #   - name: my-registry-secret
   imagePullSecrets: []
 
+# Default agent image (used by agent, shard, unscheduledPods unless overridden)
+# CI builds: docker build -t docker.io/apexdata/apexdata-agent:$(git rev-parse --short=7 HEAD)
+# Update:    helm upgrade ... --set image.tag=<new-sha>
+image:
+  # -- Default image repository for all agent components
+  repository: docker.io/apexdata/apexdata-agent
+  # -- Default image tag — pin to a specific commit SHA
+  tag: "fe552c4"
+  # -- Default pull policy (IfNotPresent for pinned tags, use Always for mutable tags like 'latest')
+  pullPolicy: IfNotPresent
+
 # ApexData configuration (REQUIRED)
 apexdata:
   # -- Client name (used as username and to build endpoint)
@@ -137,13 +148,11 @@ agent:
   # -- Enable Agent deployment
   enabled: true
 
-  image:
-    # -- Agent image repository
-    repository: docker.io/apexdata/apexdata-agent
-    # -- Agent image tag
-    tag: latest
-    # -- Image pull policy
-    pullPolicy: Always
+  # -- Override global image settings for agent component (optional)
+  # image:
+  #   repository: docker.io/apexdata/apexdata-agent
+  #   tag: "abc1234"
+  #   pullPolicy: IfNotPresent
 
   # -- Number of replicas
   replicas: 1
@@ -187,13 +196,11 @@ unscheduledPods:
   # -- Enable Unscheduled Pods tracker deployment
   enabled: true
 
-  image:
-    # -- Image repository
-    repository: docker.io/apexdata/apexdata-agent
-    # -- Image tag
-    tag: latest
-    # -- Image pull policy
-    pullPolicy: Always
+  # -- Override global image settings for unscheduledPods component (optional)
+  # image:
+  #   repository: docker.io/apexdata/apexdata-agent
+  #   tag: "abc1234"
+  #   pullPolicy: IfNotPresent
 
   # -- Number of replicas
   replicas: 1
@@ -234,13 +241,11 @@ shard:
   # -- Enable Shard DaemonSet
   enabled: true
 
-  image:
-    # -- Image repository
-    repository: docker.io/apexdata/apexdata-agent
-    # -- Image tag
-    tag: latest
-    # -- Image pull policy
-    pullPolicy: Always
+  # -- Override global image settings for shard component (optional)
+  # image:
+  #   repository: docker.io/apexdata/apexdata-agent
+  #   tag: "abc1234"
+  #   pullPolicy: IfNotPresent
 
   resources:
     limits:
@@ -274,10 +279,15 @@ shard:
   # -- Additional pod annotations
   podAnnotations: {}
 
+  # -- PostgreSQL DSN for database monitoring (stored in a Kubernetes Secret)
+  # When set, creates a Secret and injects --postgres-dsn securely via env var.
+  # Supports comma-separated DSNs for multiple instances.
+  # Example: "postgres://monitor:pass@pg-primary:5432/mydb?sslmode=require"
+  postgresDsn: ""
+
   # -- Extra arguments to pass to the agent binary
   # Examples:
   #   - "--pprof-address=localhost:6060"
-  #   - "--postgres-dsn=postgres://user:pass@host:5432/dbname?sslmode=disable"
   #   - "--pg-schema-collect-enabled=false"  # disable schema collection for SQL Explain
   #   - "--pg-schema-collect-interval=2h"    # collect schema metadata every 2 hours
   extraArgs: []

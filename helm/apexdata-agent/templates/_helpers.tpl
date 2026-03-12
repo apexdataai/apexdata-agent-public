@@ -157,3 +157,21 @@ imagePullSecrets:
 {{- toYaml . | nindent 2 }}
 {{- end }}
 {{- end }}
+
+{{/*
+Resolve agent image: component override > global default
+Usage: {{ include "apexdata-agent.agentImage" (dict "component" .Values.agent "global" .Values.image) }}
+*/}}
+{{- define "apexdata-agent.agentImage" -}}
+{{- $repo := default .global.repository ((.component).image).repository -}}
+{{- $tag := default .global.tag ((.component).image).tag -}}
+{{- printf "%s:%s" $repo $tag -}}
+{{- end }}
+
+{{/*
+Resolve agent image pull policy: component override > global default
+Usage: {{ include "apexdata-agent.agentPullPolicy" (dict "component" .Values.agent "global" .Values.image) }}
+*/}}
+{{- define "apexdata-agent.agentPullPolicy" -}}
+{{- default .global.pullPolicy ((.component).image).pullPolicy -}}
+{{- end }}

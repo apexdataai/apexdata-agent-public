@@ -1,7 +1,4 @@
 {{- if .Values.otelCollector.enabled }}
-{{- $endpoint := printf "https://%s.%s:%s" .Values.apexdata.clientName .Values.apexdata.endpointDomain .Values.apexdata.endpointPort }}
-{{- $authString := printf "%s:%s" .Values.apexdata.clientName .Values.apexdata.password }}
-{{- $base64Auth := $authString | b64enc }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -31,11 +28,11 @@ data:
         endpoint: 0.0.0.0:13133
     exporters:
       otlp:
-        endpoint: '{{ $endpoint }}'
+        endpoint: ${env:OTEL_REMOTE_ENDPOINT}
         tls:
           insecure: false
         headers:
-          Authorization: "Basic {{ $base64Auth }}"
+          Authorization: ${env:OTEL_AUTH_HEADER}
     service:
       extensions: [health_check]
       pipelines:

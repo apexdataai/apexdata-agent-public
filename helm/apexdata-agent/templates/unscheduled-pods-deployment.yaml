@@ -25,8 +25,8 @@ spec:
       automountServiceAccountToken: {{ .Values.serviceAccount.automountServiceAccountToken }}
       containers:
         - name: unscheduled-pods
-          image: "{{ .Values.unscheduledPods.image.repository }}:{{ .Values.unscheduledPods.image.tag }}"
-          imagePullPolicy: {{ .Values.unscheduledPods.image.pullPolicy }}
+          image: {{ include "apexdata-agent.agentImage" (dict "component" .Values.unscheduledPods "global" .Values.image) | quote }}
+          imagePullPolicy: {{ include "apexdata-agent.agentPullPolicy" (dict "component" .Values.unscheduledPods "global" .Values.image) }}
           args:
             - --disable-node-collector
             - --resources=pods
@@ -39,11 +39,20 @@ spec:
               value: '{{ include "apexdata-agent.fullname" . }}-otel-collector:{{ .Values.otelCollector.service.ports.grpc }}'
             {{- else }}
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
-              value: '{{ include "apexdata-agent.otelEndpoint" . }}'
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "apexdata-agent.fullname" . }}-otlp-credentials
+                  key: OTEL_EXPORTER_OTLP_ENDPOINT
             - name: OTEL_EXPORTER_OTLP_HEADERS
-              value: 'Authorization={{ include "apexdata-agent.otelAuthHeader" . }}'
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "apexdata-agent.fullname" . }}-otlp-credentials
+                  key: OTEL_EXPORTER_OTLP_HEADERS
             - name: OTEL_EXPORTER_OTLP_PROTOCOL
-              value: 'grpc'
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "apexdata-agent.fullname" . }}-otlp-credentials
+                  key: OTEL_EXPORTER_OTLP_PROTOCOL
             {{- end }}
             - name: K8S_CLUSTER_NAME
               value: {{ .Values.apexdata.clusterName | quote }}

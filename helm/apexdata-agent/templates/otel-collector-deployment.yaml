@@ -17,6 +17,7 @@ spec:
         {{- include "apexdata-agent.otelCollector.labels" . | nindent 8 }}
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/otel-collector-configmap.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/otel-collector-secret.yaml") . | sha256sum }}
         {{- with .Values.otelCollector.podAnnotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -40,6 +41,16 @@ spec:
                   fieldPath: status.podIP
             - name: GOMEMLIMIT
               value: {{ .Values.otelCollector.goMemLimit | quote }}
+            - name: OTEL_REMOTE_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "apexdata-agent.fullname" . }}-otel-collector-credentials
+                  key: OTEL_REMOTE_ENDPOINT
+            - name: OTEL_AUTH_HEADER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "apexdata-agent.fullname" . }}-otel-collector-credentials
+                  key: OTEL_AUTH_HEADER
           ports:
             - name: otlp-grpc
               containerPort: {{ .Values.otelCollector.service.ports.grpc }}
