@@ -30,6 +30,9 @@ spec:
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
       hostPID: true
+      {{- if .Values.shard.runtimeClassName }}
+      runtimeClassName: {{ .Values.shard.runtimeClassName | quote }}
+      {{- end }}
       containers:
         - name: shard
           image: {{ include "apexdata-agent.agentImage" (dict "component" .Values.shard "global" .Values.image) | quote }}
@@ -44,6 +47,12 @@ spec:
             - {{ . | quote }}
             {{- end }}
           env:
+            {{- if .Values.shard.runtimeClassName }}
+            - name: NVIDIA_VISIBLE_DEVICES
+              value: all
+            - name: NVIDIA_DRIVER_CAPABILITIES
+              value: utility
+            {{- end }}
             - name: OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE
               value: cumulative
             {{- if .Values.otelCollector.enabled }}
@@ -116,6 +125,11 @@ spec:
               readOnly: true
             - name: tmp
               mountPath: /tmp
+            {{- if .Values.shard.nvidiaLibsHostPath }}
+            - name: nvidia-libs
+              mountPath: /host/nvidia-libs
+              readOnly: true
+            {{- end }}
       {{- with .Values.shard.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
@@ -143,4 +157,9 @@ spec:
             path: /sys/fs/bpf
         - name: tmp
           emptyDir: {}
+        {{- if .Values.shard.nvidiaLibsHostPath }}
+        - name: nvidia-libs
+          hostPath:
+            path: {{ .Values.shard.nvidiaLibsHostPath }}
+        {{- end }}
 {{- end }}

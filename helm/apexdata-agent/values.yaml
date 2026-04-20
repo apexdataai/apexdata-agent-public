@@ -292,6 +292,15 @@ shard:
   #   - "--pg-schema-collect-interval=2h"    # collect schema metadata every 2 hours
   extraArgs: []
 
+  # -- Mount NVIDIA libraries from host for GPU metrics (without consuming nvidia.com/gpu resource)
+  # Set to the host path containing libnvidia-ml.so.1 (e.g., /usr/lib/x86_64-linux-gnu)
+  nvidiaLibsHostPath: ""
+
+  # -- RuntimeClass for GPU support (e.g., "nvidia" when gpu-operator is installed)
+  # The nvidia runtime injects GPU libraries and devices into the container automatically.
+  # Required for GPU metrics in K8s when using Alpine-based images.
+  runtimeClassName: ""
+
   # -- Update strategy for DaemonSet
   updateStrategy:
     type: RollingUpdate

@@ -283,6 +283,83 @@ When `otelCollector.enabled=false`:
 | `serviceAccount.automountServiceAccountToken` | Auto-mount token | `true` |
 | `rbac.create` | Create ClusterRole/ClusterRoleBinding | `true` |
 
+### GPU Monitoring
+
+The agent automatically detects and collects GPU metrics from NVIDIA and AMD GPUs. In Kubernetes, GPU monitoring requires additional configuration to expose the GPU driver libraries to the agent container.
+
+**NVIDIA GPU with gpu-operator:**
+
+When the [NVIDIA GPU Operator](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/index.html) is installed, set `runtimeClassName` to use the NVIDIA container runtime:
+
+```bash
+helm install apexdata-agent ./helm/apexdata-agent \
+  --namespace apexdata-ai --create-namespace \
+  --set apexdata.clientName="your-client-name" \
+  --set apexdata.password="your-password" \
+  --set apexdata.clusterName="your-cluster-name" \
+  --set shard.runtimeClassName=nvidia
+```
+
+This injects the NVIDIA driver libraries (including `libnvidia-ml.so.1`) into the shard container without consuming `nvidia.com/gpu` device resources, so GPU workloads are not affected.
+
+**NVIDIA GPU without gpu-operator:**
+
+If the NVIDIA Container Toolkit is not installed, you can mount the host's NVIDIA libraries directly:
+
+```bash
+helm install apexdata-agent ./helm/apexdata-agent \
+  --namespace apexdata-ai --create-namespace \
+  --set apexdata.clientName="your-client-name" \
+  --set apexdata.password="your-password" \
+  --set apexdata.clusterName="your-cluster-name" \
+  --set shard.nvidiaLibsHostPath=/usr/lib/x86_64-linux-gnu
+```
+
+Adjust the path to match your host's NVIDIA library location (`/usr/lib64` on RHEL/CentOS).
+
+**Disabling GPU metrics:**
+
+```yaml
+shard:
+  extraArgs:
+    - "--disable-gpu-metrics"
+```
+
+**Collected GPU Metrics:**
+
+| Metric | Description |
+|--------|-------------|
+| `node_gpu_info` | GPU device info (name, UUID, vendor) |
+| `node_gpu_utilization_percent` | GPU compute utilization |
+| `node_gpu_memory_utilization_percent` | GPU memory controller utilization |
+| `node_gpu_memory_used_bytes` | GPU memory used |
+| `node_gpu_memory_total_bytes` | GPU memory total |
+| `node_gpu_memory_free_bytes` | GPU memory free |
+| `node_gpu_temperature_celsius` | GPU temperature |
+| `node_gpu_power_draw_watts` | GPU power draw |
+| `node_gpu_power_limit_watts` | GPU power management limit |
+| `node_gpu_fan_speed_percent` | GPU fan speed |
+| `node_gpu_clock_graphics_hertz` | Graphics clock speed |
+| `node_gpu_clock_memory_hertz` | Memory clock speed |
+| `node_gpu_clock_sm_hertz` | Streaming multiprocessor clock |
+| `node_gpu_encoder_utilization_percent` | Hardware encoder utilization |
+| `node_gpu_decoder_utilization_percent` | Hardware decoder utilization |
+| `node_gpu_pcie_tx_bytes_per_second` | PCIe transmit throughput |
+| `node_gpu_pcie_rx_bytes_per_second` | PCIe receive throughput |
+| `node_gpu_ecc_errors_total` | ECC error count (corrected/uncorrected) |
+| `node_gpu_throttle_thermal` | Thermal throttling indicator |
+| `node_gpu_throttle_power` | Power throttling indicator |
+| `node_gpu_throttle_hw_slowdown` | Hardware slowdown indicator |
+| `node_gpu_energy_joules_total` | Total energy consumption |
+| `container_gpu_memory_used_bytes` | Per-container GPU memory (NVIDIA only) |
+
+All metrics include `gpu_index`, `gpu_name`, and `gpu_vendor` labels.
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `shard.runtimeClassName` | RuntimeClass for GPU support (e.g., `nvidia`) | `""` |
+| `shard.nvidiaLibsHostPath` | Host path to mount NVIDIA libraries from | `""` |
+
 ### Database Monitoring (Extra Args)
 
 The agent supports PostgreSQL monitoring via `shard.extraArgs`. These flags are passed directly to the agent binary:
