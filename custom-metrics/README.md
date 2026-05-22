@@ -36,6 +36,12 @@ export OTEL_SERVICE_NAME=my-app
 go run send_metrics.go
 ```
 
+Or with Node.js:
+
+```bash
+npm install && npm start
+```
+
 ## Environment Variables
 
 | Variable | Description | Default |
@@ -119,6 +125,36 @@ meter.Float64ObservableGauge("custom.cpu.usage",
     }),
 )
 ```
+
+### JavaScript (Producer + Standard API)
+
+In JavaScript, Counter and Histogram go through a `MetricProducer` — the equivalent of
+the Go `Producer` — registered on the metric reader:
+
+```javascript
+class CustomMetricsProducer {
+  async collect() {
+    return {
+      resourceMetrics: {
+        resource: resourceFromAttributes({}),
+        scopeMetrics: [{
+          scope: { name: 'my-app' },
+          metrics: [/* SumMetricData / HistogramMetricData */],
+        }],
+      },
+      errors: [],
+    };
+  }
+}
+
+const reader = new PeriodicExportingMetricReader({
+  exporter,
+  metricProducers: [new CustomMetricsProducer()],
+});
+```
+
+UpDownCounter and ObservableGauge use the standard API
+(`meter.createUpDownCounter(...)`, `meter.createObservableGauge(...)`).
 
 ## Metric Naming
 
@@ -244,6 +280,70 @@ env:
     value: "my-app"
 ```
 
+## Running Outside Kubernetes
+
+The sender is an ordinary OTLP client — it runs on any host (a VM, bare metal, a
+developer machine), not only inside a Kubernetes pod. This is the "Direct to Remote"
+mode without Kubernetes: there is no Helm-managed Secret, so you provide the credentials
+yourself via environment variables.
+
+```bash
+export OTEL_EXPORTER_OTLP_ENDPOINT="YOUR_CLIENT.collector.eu.apexdata.ai:444"
+export OTEL_EXPORTER_OTLP_HEADERS="authorization=Basic YOUR_BASE64_TOKEN"
+export OTEL_SERVICE_NAME=my-app
+# TLS is on by default — do NOT set OTEL_EXPORTER_OTLP_INSECURE
+```
+
+Then run the sender one of three ways:
+
+**1. Directly**
+
+```bash
+go build -o send-metrics send_metrics.go && ./send-metrics   # Go
+python send_metrics.py                                        # Python
+npm install && node send_metrics.js                           # JavaScript
+```
+
+**2. With Docker** (on any host with Docker)
+
+```bash
+docker build -t custom-metrics .
+docker run --rm \
+  -e OTEL_EXPORTER_OTLP_ENDPOINT \
+  -e OTEL_EXPORTER_OTLP_HEADERS \
+  -e OTEL_SERVICE_NAME \
+  custom-metrics
+```
+
+**3. As a long-running service (systemd)**
+
+For a host that should send continuously, wrap the built binary in a systemd unit:
+
+```ini
+# /etc/systemd/system/custom-metrics.service
+[Unit]
+Description=Custom metrics sender
+After=network-online.target
+
+[Service]
+ExecStart=/opt/custom-metrics/send-metrics
+Environment=OTEL_EXPORTER_OTLP_ENDPOINT=YOUR_CLIENT.collector.eu.apexdata.ai:444
+Environment=OTEL_EXPORTER_OTLP_HEADERS=authorization=Basic YOUR_BASE64_TOKEN
+Environment=OTEL_SERVICE_NAME=my-host-app
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+sudo systemctl daemon-reload && sudo systemctl enable --now custom-metrics
+```
+
+> If the host already runs an OTel Collector, point the sender at it
+> (`OTEL_EXPORTER_OTLP_ENDPOINT=localhost:4317`, `OTEL_EXPORTER_OTLP_INSECURE=true`)
+> instead of going direct.
+
 ## Architecture
 
 ```
@@ -296,6 +396,8 @@ env:
 |------|-------------|
 | `send_metrics.go` | Complete Go example with all metric types (Counter, Histogram, UpDownCounter, Gauge) |
 | `send_metrics_debug.go` | Simplified debug/testing version |
+| `send_metrics.js` | JavaScript example — Producer for Counter/Histogram, standard API for Gauge/UpDownCounter |
+| `package.json` | Node.js dependencies for the JavaScript example |
 | `send_metrics.py` | Python example with all metric types |
 | `Dockerfile` | Multi-stage build for Go example |
 | `k8s/app-local-collector.yaml` | App deployment using shared Helm collector (no auth) |
