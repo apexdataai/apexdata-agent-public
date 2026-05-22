@@ -3,3 +3,4 @@ __pycache__/
 *.pyc
 send-metrics
 .claude/
+node_modules/
