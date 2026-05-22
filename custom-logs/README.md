@@ -36,6 +36,12 @@ export OTEL_SERVICE_NAME=my-app
 go run send_logs.go
 ```
 
+Or with Node.js:
+
+```bash
+npm install && npm start
+```
+
 ## Environment Variables
 
 | Variable | Description | Default |
@@ -87,6 +93,31 @@ logging.getLogger().addHandler(handler)
 
 logging.info("request handled", extra={"http.route": "/api/users", "http.status_code": 200})
 ```
+
+### JavaScript — raw logs SDK
+
+```javascript
+const { LoggerProvider, BatchLogRecordProcessor } = require('@opentelemetry/sdk-logs');
+const { OTLPLogExporter } = require('@opentelemetry/exporter-logs-otlp-grpc');
+const { SeverityNumber } = require('@opentelemetry/api-logs');
+
+const loggerProvider = new LoggerProvider({
+  resource,
+  processors: [new BatchLogRecordProcessor(new OTLPLogExporter({ url, metadata }))],
+});
+const logger = loggerProvider.getLogger('my-app');
+
+logger.emit({
+  severityNumber: SeverityNumber.INFO,
+  severityText: 'INFO',
+  body: 'request handled',
+  attributes: { 'http.route': '/api/users', 'http.status_code': 200 },
+});
+```
+
+If your app already uses **Winston**, bridge instead with
+`@opentelemetry/winston-transport` — add `OpenTelemetryTransportV3` as a Winston
+transport and your existing `logger.info(...)` calls flow to OTLP unchanged.
 
 ### Raw API (advanced)
 
@@ -224,6 +255,70 @@ env:
     value: "my-app"
 ```
 
+## Running Outside Kubernetes
+
+The sender is an ordinary OTLP client — it runs on any host (a VM, bare metal, a
+developer machine), not only inside a Kubernetes pod. This is the "Direct to Remote"
+mode without Kubernetes: there is no Helm-managed Secret, so you provide the credentials
+yourself via environment variables.
+
+```bash
+export OTEL_EXPORTER_OTLP_ENDPOINT="YOUR_CLIENT.collector.eu.apexdata.ai:444"
+export OTEL_EXPORTER_OTLP_HEADERS="authorization=Basic YOUR_BASE64_TOKEN"
+export OTEL_SERVICE_NAME=my-app
+# TLS is on by default — do NOT set OTEL_EXPORTER_OTLP_INSECURE
+```
+
+Then run the sender one of three ways:
+
+**1. Directly**
+
+```bash
+go build -o send-logs send_logs.go && ./send-logs   # Go
+python send_logs.py                                  # Python
+npm install && node send_logs.js                     # JavaScript
+```
+
+**2. With Docker** (on any host with Docker)
+
+```bash
+docker build -t custom-logs .
+docker run --rm \
+  -e OTEL_EXPORTER_OTLP_ENDPOINT \
+  -e OTEL_EXPORTER_OTLP_HEADERS \
+  -e OTEL_SERVICE_NAME \
+  custom-logs
+```
+
+**3. As a long-running service (systemd)**
+
+For a host that should send continuously, wrap the built binary in a systemd unit:
+
+```ini
+# /etc/systemd/system/custom-logs.service
+[Unit]
+Description=Custom logs sender
+After=network-online.target
+
+[Service]
+ExecStart=/opt/custom-logs/send-logs
+Environment=OTEL_EXPORTER_OTLP_ENDPOINT=YOUR_CLIENT.collector.eu.apexdata.ai:444
+Environment=OTEL_EXPORTER_OTLP_HEADERS=authorization=Basic YOUR_BASE64_TOKEN
+Environment=OTEL_SERVICE_NAME=my-host-app
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+sudo systemctl daemon-reload && sudo systemctl enable --now custom-logs
+```
+
+> If the host already runs an OTel Collector, point the sender at it
+> (`OTEL_EXPORTER_OTLP_ENDPOINT=localhost:4317`, `OTEL_EXPORTER_OTLP_INSECURE=true`)
+> instead of going direct.
+
 ## Architecture
 
 ```
@@ -265,6 +360,8 @@ env:
 | `Dockerfile` | Multi-stage build for the Go example |
 | `k8s/app-local-collector.yaml` | App deployment using the shared Helm collector (no auth) |
 | `k8s/app-remote-collector.yaml` | App deployment sending directly to remote (TLS + Basic Auth) |
+| `send_logs.js` | JavaScript example — raw logs SDK, all severities, trace correlation |
+| `package.json` | Node.js dependencies for the JavaScript example |
 
 ## Troubleshooting
 
