@@ -1,0 +1,38 @@
+# App sending logs directly to the remote collector (TLS + Basic Auth).
+# Credentials come from the Secret the agent Helm chart creates.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: custom-logs-demo
+  namespace: apexdata-ai
+  labels:
+    app: custom-logs-demo
+    app.kubernetes.io/part-of: apexdata
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: custom-logs-demo
+  template:
+    metadata:
+      labels:
+        app: custom-logs-demo
+        app.kubernetes.io/part-of: apexdata
+    spec:
+      containers:
+        - name: app
+          image: YOUR_REGISTRY/custom-logs:latest
+          env:
+            - name: OTEL_SERVICE_NAME
+              value: "my-app"
+            # TLS enabled by default (OTEL_EXPORTER_OTLP_INSECURE not set)
+          envFrom:
+            - secretRef:
+                name: apexdata-agent-otlp-credentials   # created by Helm chart
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
