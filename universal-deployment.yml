@@ -223,6 +223,48 @@ subjects:
     namespace: apexdata-ai
 
 ---
+# Kubernetes Events are cluster-scoped: the cluster-level agent Deployment
+# elects a single exporter through this Lease; node shards and the
+# unscheduled-pods watcher stay idle instead of each exporting every event.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: apexdata-k8s-event-exporter
+  namespace: apexdata-ai
+rules:
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - create
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  resourceNames:
+  - apexdata-k8s-event-exporter
+  verbs:
+  - get
+  - update
+  - patch
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: apexdata-k8s-event-exporter
+  namespace: apexdata-ai
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: apexdata-k8s-event-exporter
+subjects:
+  - kind: ServiceAccount
+    name: apexdata-agent-sa
+    namespace: apexdata-ai
+
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -246,6 +288,8 @@ spec:
           imagePullPolicy: Always
           args:
             - --disable-node-collector
+            - --k8s-event-export-mode=leader
+            - --k8s-event-lease-namespace=apexdata-ai
             - --resources=certificatesigningrequests,configmaps,cronjobs,daemonsets,deployments,endpoints,horizontalpodautoscalers,ingresses,jobs,leases,limitranges,mutatingwebhookconfigurations,namespaces,networkpolicies,nodes,persistentvolumeclaims,persistentvolumes,poddisruptionbudgets,replicasets,replicationcontrollers,resourcequotas,secrets,services,statefulsets,storageclasses,validatingwebhookconfigurations,volumeattachments
           env:
             - name: OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE
@@ -274,20 +318,20 @@ spec:
               command:
                 - /bin/sh
                 - -c
-                - "pgrep -f apexdata-agent || exit 1"
+                - "pgrep -x apexdata-agent || exit 1"
             initialDelaySeconds: 30
             periodSeconds: 30
-            timeoutSeconds: 5
+            timeoutSeconds: 15
             failureThreshold: 3
           startupProbe:
             exec:
               command:
                 - /bin/sh
                 - -c
-                - "pgrep -f apexdata-agent || exit 1"
+                - "pgrep -x apexdata-agent || exit 1"
             initialDelaySeconds: 10
             periodSeconds: 10
-            timeoutSeconds: 5
+            timeoutSeconds: 15
             failureThreshold: 12
 
           securityContext:
@@ -331,6 +375,7 @@ spec:
           imagePullPolicy: Always
           args:
             - --disable-node-collector
+            - --k8s-event-export-mode=disabled
             - --resources=pods
             - --track-unscheduled-pods
           env:
@@ -360,20 +405,20 @@ spec:
               command:
                 - /bin/sh
                 - -c
-                - "pgrep -f apexdata-agent || exit 1"
+                - "pgrep -x apexdata-agent || exit 1"
             initialDelaySeconds: 30
             periodSeconds: 30
-            timeoutSeconds: 5
+            timeoutSeconds: 15
             failureThreshold: 3
           startupProbe:
             exec:
               command:
                 - /bin/sh
                 - -c
-                - "pgrep -f apexdata-agent || exit 1"
+                - "pgrep -x apexdata-agent || exit 1"
             initialDelaySeconds: 10
             periodSeconds: 10
-            timeoutSeconds: 5
+            timeoutSeconds: 15
             failureThreshold: 12
 
           securityContext:
@@ -420,6 +465,7 @@ spec:
           image: docker.io/apexdata/apexdata-agent
           imagePullPolicy: Always
           args:
+            - --k8s-event-export-mode=disabled
             - --resources=pods
             - --node=$(NODE_NAME)
           env:
@@ -449,20 +495,20 @@ spec:
               command:
                 - /bin/sh
                 - -c
-                - "pgrep -f apexdata-agent || exit 1"
+                - "pgrep -x apexdata-agent || exit 1"
             initialDelaySeconds: 60
             periodSeconds: 30
-            timeoutSeconds: 5
+            timeoutSeconds: 15
             failureThreshold: 3
           startupProbe:
             exec:
               command:
                 - /bin/sh
                 - -c
-                - "pgrep -f apexdata-agent || exit 1"
+                - "pgrep -x apexdata-agent || exit 1"
             initialDelaySeconds: 10
             periodSeconds: 10
-            timeoutSeconds: 5
+            timeoutSeconds: 15
             failureThreshold: 18
 
           securityContext:

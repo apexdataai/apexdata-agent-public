@@ -29,10 +29,32 @@ spec:
           imagePullPolicy: {{ include "apexdata-agent.agentPullPolicy" (dict "component" .Values.agent "global" .Values.image) }}
           args:
             - --disable-node-collector
+            # Singleton Kubernetes Event exporter: this Deployment coordinates
+            # through the Lease from event-exporter-role.yaml; shards stay idle.
+            - --k8s-event-export-mode=leader
+            - --k8s-event-lease-namespace={{ include "apexdata-agent.namespace" . }}
+            - --k8s-event-lease-name={{ include "apexdata-agent.fullname" . }}-k8s-event-exporter
             - --resources={{ .Values.agent.resourcesList }}
           env:
             - name: OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE
               value: cumulative
+            # Lease holder identity (downward API): pod name + UID make the
+            # holder recognizable in `kubectl get lease` during failover.
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.namespace
+            - name: POD_UID
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.uid
             {{- if .Values.otelCollector.enabled }}
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               value: '{{ include "apexdata-agent.fullname" . }}-otel-collector:{{ .Values.otelCollector.service.ports.grpc }}'
@@ -66,20 +88,20 @@ spec:
               command:
                 - /bin/sh
                 - -c
-                - "pgrep -f apexdata-agent || exit 1"
+                - "pgrep -x apexdata-agent || exit 1"
             initialDelaySeconds: 30
             periodSeconds: 30
-            timeoutSeconds: 5
+            timeoutSeconds: 15
             failureThreshold: 3
           startupProbe:
             exec:
               command:
                 - /bin/sh
                 - -c
-                - "pgrep -f apexdata-agent || exit 1"
+                - "pgrep -x apexdata-agent || exit 1"
             initialDelaySeconds: 10
             periodSeconds: 10
-            timeoutSeconds: 5
+            timeoutSeconds: 15
             failureThreshold: 12
           securityContext:
             {{- toYaml .Values.agent.securityContext | nindent 12 }}

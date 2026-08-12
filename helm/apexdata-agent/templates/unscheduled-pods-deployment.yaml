@@ -31,6 +31,9 @@ spec:
             - --disable-node-collector
             - --resources=pods
             - --track-unscheduled-pods
+            # Cluster Events belong to the agent Deployment's lease singleton
+            # (or to the shards' direct watch when that role is disabled).
+            - --k8s-event-export-mode=disabled
           env:
             - name: OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE
               value: cumulative
@@ -67,20 +70,20 @@ spec:
               command:
                 - /bin/sh
                 - -c
-                - "pgrep -f apexdata-agent || exit 1"
+                - "pgrep -x apexdata-agent || exit 1"
             initialDelaySeconds: 30
             periodSeconds: 30
-            timeoutSeconds: 5
+            timeoutSeconds: 15
             failureThreshold: 3
           startupProbe:
             exec:
               command:
                 - /bin/sh
                 - -c
-                - "pgrep -f apexdata-agent || exit 1"
+                - "pgrep -x apexdata-agent || exit 1"
             initialDelaySeconds: 10
             periodSeconds: 10
-            timeoutSeconds: 5
+            timeoutSeconds: 15
             failureThreshold: 12
           securityContext:
             {{- toYaml .Values.unscheduledPods.securityContext | nindent 12 }}

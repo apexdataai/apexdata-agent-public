@@ -40,6 +40,16 @@ spec:
           args:
             - --resources=pods
             - --node=$(NODE_NAME)
+            {{- if .Values.agent.enabled }}
+            # Cluster Events are exported once by the agent Deployment (lease
+            # singleton); every node shard exporting them too would duplicate
+            # each event N-nodes times.
+            - --k8s-event-export-mode=disabled
+            {{- else }}
+            # No cluster-level agent in this install: keep the pre-singleton
+            # direct watch so cluster Events are not silently lost.
+            - --k8s-event-export-mode=direct
+            {{- end }}
             {{- if .Values.shard.postgresDsn }}
             - --postgres-dsn=$(POSTGRES_DSN)
             {{- end }}
@@ -95,20 +105,20 @@ spec:
               command:
                 - /bin/sh
                 - -c
-                - "pgrep -f apexdata-agent || exit 1"
+                - "pgrep -x apexdata-agent || exit 1"
             initialDelaySeconds: 60
             periodSeconds: 30
-            timeoutSeconds: 5
+            timeoutSeconds: 15
             failureThreshold: 3
           startupProbe:
             exec:
               command:
                 - /bin/sh
                 - -c
-                - "pgrep -f apexdata-agent || exit 1"
+                - "pgrep -x apexdata-agent || exit 1"
             initialDelaySeconds: 10
             periodSeconds: 10
-            timeoutSeconds: 5
+            timeoutSeconds: 15
             failureThreshold: 18
           securityContext:
             {{- toYaml .Values.shard.securityContext | nindent 12 }}
