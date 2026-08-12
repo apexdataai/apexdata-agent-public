@@ -99,6 +99,13 @@ curl -fsSL http://grogh.apexdata.ai/install.sh | sudo bash -s -- install
 
 The Helm chart supports two deployment modes controlled by `otelCollector.enabled`.
 
+The chart deploys the rolling `latest` agent image by default; every release
+also publishes an immutable short-sha tag you can pin instead — see
+[Upgrading](helm/apexdata-agent/README.md#upgrading) in the chart README.
+Cluster Events are exported by a single lease-coordinated instance (the agent
+Deployment), not once per node — see
+[Kubernetes Events Export](helm/apexdata-agent/README.md#kubernetes-events-export).
+
 ### Prerequisites
 
 - Kubernetes 1.20+
@@ -204,6 +211,11 @@ kubectl delete namespace apexdata-ai  # optional
 ## Kubernetes Deployment (Manual)
 
 For environments without Helm. Uses `envsubst` templating with a single YAML manifest.
+
+The manifest follows the rolling `latest` agent image and carries the same
+role split as the chart: the cluster-level Deployment is the single
+lease-coordinated Kubernetes Events exporter, node shards and the
+unscheduled-pods watcher stay idle.
 
 ### Prerequisites
 

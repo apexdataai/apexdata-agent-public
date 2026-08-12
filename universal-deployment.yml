@@ -294,6 +294,23 @@ spec:
           env:
             - name: OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE
               value: cumulative
+            # Lease holder identity (downward API): pod name + UID make the
+            # Event-exporter leader recognizable in `kubectl get lease`.
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.namespace
+            - name: POD_UID
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.uid
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               value: 'https://${APEXDATA_OTEL_ENDPOINT}:444'
             - name: OTEL_EXPORTER_OTLP_HEADERS
