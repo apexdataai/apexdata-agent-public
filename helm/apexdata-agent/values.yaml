@@ -19,15 +19,16 @@ global:
   imagePullSecrets: []
 
 # Default agent image (used by agent, shard, unscheduledPods unless overridden)
-# CI builds: docker build -t docker.io/apexdata/apexdata-agent:$(git rev-parse --short=7 HEAD)
-# Update:    helm upgrade ... --set image.tag=<new-sha>
+# The default follows the rolling `latest` release tag. Every release also
+# publishes an immutable short-sha tag — pin one for fully reproducible
+# deploys: helm upgrade ... --set image.tag=<short-sha> --set image.pullPolicy=IfNotPresent
 image:
   # -- Default image repository for all agent components
   repository: docker.io/apexdata/apexdata-agent
-  # -- Default image tag — pin to a specific commit SHA
-  tag: "b38b4f8"
-  # -- Default pull policy (IfNotPresent for pinned tags, use Always for mutable tags like 'latest')
-  pullPolicy: IfNotPresent
+  # -- Default image tag: `latest` (rolling release). Pin an immutable short-sha tag for reproducible deploys.
+  tag: "latest"
+  # -- Default pull policy (Always for the mutable `latest`; use IfNotPresent with a pinned sha tag)
+  pullPolicy: Always
 
 # ApexData configuration (REQUIRED)
 apexdata:

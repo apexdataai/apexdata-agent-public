@@ -199,6 +199,17 @@ The endpoint is automatically built as `https://{clientName}.{endpointDomain}:{e
 | `global.createNamespace` | Create namespace if not exists | `true` |
 | `global.imagePullSecrets` | Image pull secrets for private registries | `[]` |
 
+### Image
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `image.repository` | Default image repository for all agent components | `docker.io/apexdata/apexdata-agent` |
+| `image.tag` | Default image tag. `latest` is the rolling release; every release also publishes an immutable short-sha tag for pinning | `latest` |
+| `image.pullPolicy` | Default pull policy (`Always` suits the mutable `latest`; use `IfNotPresent` with a pinned sha tag) | `Always` |
+
+Each component (`agent`, `shard`, `unscheduledPods`) can override the global
+image settings via its own `image:` block.
+
 ### ApexData Endpoint
 
 | Parameter | Description | Default |
@@ -282,6 +293,23 @@ When `otelCollector.enabled=false`:
 | `serviceAccount.annotations` | SA annotations (IRSA, Workload Identity) | `{}` |
 | `serviceAccount.automountServiceAccountToken` | Auto-mount token | `true` |
 | `rbac.create` | Create ClusterRole/ClusterRoleBinding | `true` |
+
+### Kubernetes Events Export
+
+Kubernetes Events are cluster-scoped, so the chart configures a single
+exporter instead of one per node:
+
+- The **agent Deployment** runs with `--k8s-event-export-mode=leader` and
+  coordinates through a namespaced Lease (`{release}-apexdata-agent-k8s-event-exporter`);
+  the chart ships the Role/RoleBinding it needs. On failover the new leader
+  does not re-export retained events.
+- **Shard** and **unscheduled-pods** instances stay idle (`disabled`).
+- With `agent.enabled=false` the shards fall back to a direct watch so
+  events keep flowing (at the cost of per-node duplication).
+- If the Lease RBAC is missing (e.g. pre-0.2 installs), the agent
+  automatically falls back to the direct watch — events are never lost.
+
+No configuration is required; the modes are set per component by the chart.
 
 ### GPU Monitoring
 
@@ -464,6 +492,18 @@ shard (per node) ──┘                                         └──> Ot
 helm upgrade apexdata-agent ./helm/apexdata-agent \
   --namespace apexdata-ai \
   -f my-values.yaml
+```
+
+The default `image.tag: latest` follows the rolling release — an upgrade (or
+a pod restart with `pullPolicy: Always`) picks up the newest agent. For
+fully reproducible deploys pin an immutable short-sha tag:
+
+```bash
+helm upgrade apexdata-agent ./helm/apexdata-agent \
+  --namespace apexdata-ai \
+  -f my-values.yaml \
+  --set image.tag=<short-sha> \
+  --set image.pullPolicy=IfNotPresent
 ```
 
 ## Uninstallation
