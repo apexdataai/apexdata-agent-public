@@ -25,7 +25,7 @@ image:
   # -- Default image repository for all agent components
   repository: docker.io/apexdata/apexdata-agent
   # -- Default image tag — pin to a specific commit SHA
-  tag: "5fa35b5"
+  tag: "b38b4f8"
   # -- Default pull policy (IfNotPresent for pinned tags, use Always for mutable tags like 'latest')
   pullPolicy: IfNotPresent
 
